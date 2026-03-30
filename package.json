@@ -1,15 +1,17 @@
 {
-  "name": "work-coordinator",
+  "name": "oh-my-workers",
   "version": "1.0.1",
-  "description": "A work coordinator that automates daily KPI reporting",
+  "description": "A personal AI agent that automates daily working tasks at workplace, eg: Cronjobs, KPI reporting and etc",
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "tsc": "pnpm exec tsc --noEmit 2>&1",
-    "dev": "node --loader ts-node/esm src/index.ts"
+    "dev": "node --loader ts-node/esm src/index.ts",
+    "setup": "pnpm run dev --setup",
+    "start": "pnpm run dev --run",
+    "tsc": "pnpm exec tsc --noEmit 2>&1"
   },
-  "keywords": ["work coordinator", "kpi", "daily work diary"],
-  "author": "Damengrandom",
+  "keywords": ["oh-my-workers", "kpi", "daily work diary", "cronjobs", "automation", "AI agent", "langchain", "typescript"],
+  "author": "damengrandom",
   "license": "ISC",
   "packageManager": "pnpm@10.7.1",
   "dependencies": {

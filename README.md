@@ -1,4 +1,4 @@
-# Work Coordinator
+# Oh My Workers
 
 A personal AI agent that runs every day at 5pm Sydney time to collect your GitHub activity, ask for anything else you did, and generate a daily work KPI report saved to your database.
 

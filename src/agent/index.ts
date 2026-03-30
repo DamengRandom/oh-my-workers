@@ -10,7 +10,7 @@ export async function runDailyJobs(): Promise<void> {
   const username = process.env.GITHUB_USERNAME
   const now = new Date().toISOString()
 
-  sectionLogger(`🤖 Work Coordinator — ${today}`)
+  sectionLogger(`🤖 Oh my workers — ${today}`)
 
   // ── Phase 1: Cleanup + GitHub run in parallel ──────────────────────────────
   console.log('⚡️ Phase 1: Running cleanup and GitHub fetch in parallel...\n')
