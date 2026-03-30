@@ -31,7 +31,7 @@ export const manualKpiTool = new DynamicStructuredTool({
 
     while (true) {
       const input = await promptUser('  > ')
-      
+
       if (input.toLowerCase() === 'done' || input === '') break
       if (input.length > 0) activities.push(input)
     }

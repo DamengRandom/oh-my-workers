@@ -44,24 +44,19 @@ export async function saveKpiRecord(record: KpiRecord): Promise<void> {
   await pool.query(
     `INSERT INTO kpi (github_summary, commits_count, prs_count, activities, created_at, updated_at)
      VALUES ($1, $2, $3, $4, $5, $6)`,
-    [record.github_summary, record.commits_count, record.prs_count,
-     record.activities, record.created_at, record.updated_at]
+    [record.github_summary, record.commits_count, record.prs_count, record.activities, record.created_at, record.updated_at]
   )
 }
 
 export async function saveDiaryEntry(entry: DiaryEntry): Promise<void> {
-  await pool.query(
-    `INSERT INTO diary (content, created_at, updated_at) VALUES ($1, $2, $3)`,
-    [entry.content, entry.created_at, entry.updated_at]
-  )
+  await pool.query(`INSERT INTO diary (content, created_at, updated_at) VALUES ($1, $2, $3)`, [entry.content, entry.created_at, entry.updated_at])
 }
 
 export async function saveCleanupLog(result: CleanupResult, tableName: string): Promise<void> {
   await pool.query(
     `INSERT INTO cleanup_log (company_table, deleted_count, failed_count, status, errors, created_at, updated_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [tableName, result.deleted_count, result.failed_count, result.status,
-     result.errors ?? [], result.created_at, result.updated_at]
+    [tableName, result.deleted_count, result.failed_count, result.status, result.errors ?? [], result.created_at, result.updated_at]
   )
 }
 

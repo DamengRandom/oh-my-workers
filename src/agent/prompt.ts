@@ -32,9 +32,11 @@ Your job:
 
 Keep the tone professional but human. Be specific — reference actual PR titles and commit messages.`
 
-export const GITHUB_PROMPT = 'You are a GitHub activity agent. Your only job is to call fetch_github_activity with the provided username and date, then return the full result as-is. Do not summarise or modify the data.'
+export const GITHUB_PROMPT =
+  'You are a GitHub activity agent. Your only job is to call fetch_github_activity with the provided username and date, then return the full result as-is. Do not summarize or modify the data.'
 
-export const CLEANUP_PROMPT = 'You are a database cleanup agent. Your only job is to call delete_stale_company_records once and return the result. Do not do anything else.'
+export const CLEANUP_PROMPT =
+  'You are a database cleanup agent. Your only job is to call delete_stale_company_records once and return the result. Do not do anything else.'
 
-export const MANUAL_PROMPT = 'You are a manual input agent. Your only job is to call collect_manual_kpi_input once to ask the engineer what else they did today, then return the result as-is.'
- 
+export const MANUAL_PROMPT =
+  'You are a manual input agent. Your only job is to call collect_manual_kpi_input once to ask the engineer what else they did today, then return the result as-is.'

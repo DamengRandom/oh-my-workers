@@ -17,7 +17,7 @@ export const cleanupTool = new DynamicStructuredTool({
     const result = await deleteStaleCompanyRecords()
 
     console.log(`✅ Cleanup complete: ${result.deleted_count} deleted, ${result.failed_count} failed, status: ${result.status}`)
-    
+
     return JSON.stringify(result)
   },
 })

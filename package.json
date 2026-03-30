@@ -8,9 +8,20 @@
     "dev": "node --loader ts-node/esm src/index.ts",
     "setup": "pnpm run dev --setup",
     "start": "pnpm run dev --run",
-    "tsc": "pnpm exec tsc --noEmit 2>&1"
+    "tsc": "pnpm exec tsc --noEmit 2>&1",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\""
   },
-  "keywords": ["oh-my-workers", "kpi", "daily work diary", "cronjobs", "automation", "AI agent", "langchain", "typescript"],
+  "keywords": [
+    "oh-my-workers",
+    "kpi",
+    "daily work diary",
+    "cronjobs",
+    "automation",
+    "AI agent",
+    "langchain",
+    "typescript"
+  ],
   "author": "damengrandom",
   "license": "ISC",
   "packageManager": "pnpm@10.7.1",
@@ -29,6 +40,7 @@
     "@types/node": "^25.5.0",
     "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.20.0",
+    "prettier": "^3.8.1",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.2"
   }

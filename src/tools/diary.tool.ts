@@ -42,11 +42,11 @@ export const diaryTool = new DynamicStructuredTool({
     if (!fs.existsSync(diaryDir)) fs.mkdirSync(diaryDir, { recursive: true })
 
     const filePath = path.join(diaryDir, `${dateStr}.md`)
-    
+
     fs.writeFileSync(filePath, `# Daily KPI Report — ${dateStr}\n\n${report_content}`)
 
     console.log(`✅ KPI report saved to database and ${filePath}`)
-    
+
     return JSON.stringify({ success: true, date: dateStr, file: filePath })
   },
 })

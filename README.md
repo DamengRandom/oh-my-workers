@@ -131,7 +131,8 @@ work-coordinator/
 │   ├── jobs/
 │   │   └── scheduler.ts        # node-cron 5pm Sydney schedule
 │   ├── storage/
-│   │   └── db.ts               # PostgreSQL queries (own DB + company DB)
+│   │   └── own-db.ts               # PostgreSQL queries (own DB)
+│   │   └── company-db.ts               # PostgreSQL queries (company DB)
 │   ├── schemas/
 │   │   └── index.ts            # Zod schemas for all data structures   
 │   ├── utils/

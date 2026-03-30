@@ -7,7 +7,7 @@ const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN })
 
 export const githubTool = new DynamicStructuredTool({
   name: 'fetch_github_activity',
-  description: 'Fetches all of today\'s GitHub commits and pull requests for the engineer, then returns a structured summary.',
+  description: "Fetches all of today's GitHub commits and pull requests for the engineer, then returns a structured summary.",
   schema: z.object({
     username: z.string().describe('GitHub username to fetch activity for'),
     date: z.string().describe('Date to fetch activity for in YYYY-MM-DD format'),
@@ -36,7 +36,7 @@ export const githubTool = new DynamicStructuredTool({
 
     const pullRequests = prsResponse.data.items.map((item) => {
       let status: 'open' | 'closed' | 'merged' = 'open'
-      
+
       if (item.pull_request?.merged_at) status = 'merged'
       else if (item.state === 'closed') status = 'closed'
 

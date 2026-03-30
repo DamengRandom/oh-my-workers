@@ -26,19 +26,16 @@ export async function deleteStaleCompanyRecords(): Promise<CleanupResult> {
 
   try {
     // Table name comes from env — not user input, safe to interpolate
-    const result = await pool.query(
-      `DELETE FROM "${table}" WHERE created_at < $1`,
-      [cutoff.toISOString()]
-    )
-    
+    const result = await pool.query(`DELETE FROM "${table}" WHERE created_at < $1`, [cutoff.toISOString()])
+
     deleted_count = result.rowCount ?? 0
     console.log(`✓ Deleted ${deleted_count} stale records from "${table}" (older than ${thresholdDays} days)`)
   } catch (err) {
     failed_count = 1
     status = 'failed'
-    
+
     const message = err instanceof Error ? err.message : String(err)
-    
+
     errors.push(message)
     console.error(`✗ Cleanup failed for "${table}": ${message}`)
   }

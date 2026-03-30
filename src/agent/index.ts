@@ -16,13 +16,8 @@ export async function runDailyJobs(): Promise<void> {
   console.log('⚡️ Phase 1: Running cleanup and GitHub fetch in parallel...\n')
 
   // Extract the raw JSON output from the tool message (not the AI's final text reply)
-  const toolOutput = (
-    result: { messages: Array<{ _getType?: () => string; content: unknown }> },
-    toolName: string
-  ): string => {
-    const msg = result.messages.find(
-      (m) => m._getType?.() === 'tool' && (m as { name?: string }).name === toolName
-    )
+  const toolOutput = (result: { messages: Array<{ _getType?: () => string; content: unknown }> }, toolName: string): string => {
+    const msg = result.messages.find((m) => m._getType?.() === 'tool' && (m as { name?: string }).name === toolName)
 
     return `${msg?.content ?? ''}`
   }
@@ -83,10 +78,12 @@ export async function runDailyJobs(): Promise<void> {
     console.log(`\n⚡️ Phase 3: Generating daily KPI report (${activities.length} manual activities recorded)...\n`)
 
     await diaryAgent.invoke({
-      messages: [{
-        role: 'user',
-        content: `Write and save today's KPI report using the data below.\n\nGitHub activity:\n${toolOutput(githubResult, 'fetch_github_activity')}\n\nManual activities:\n${toolOutput(manualResult, 'collect_manual_kpi_input')}`,
-      }],
+      messages: [
+        {
+          role: 'user',
+          content: `Write and save today's KPI report using the data below.\n\nGitHub activity:\n${toolOutput(githubResult, 'fetch_github_activity')}\n\nManual activities:\n${toolOutput(manualResult, 'collect_manual_kpi_input')}`,
+        },
+      ],
     })
   }
 
