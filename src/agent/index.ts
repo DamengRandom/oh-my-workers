@@ -5,6 +5,20 @@ import { diaryAgent } from './diary.agent.js'
 import { saveKpiRecord } from '../storage/own-db.js'
 import { sectionLogger } from '../utils/logger.js'
 
+// ── Automated (crontab) — no human input required ─────────────────────────────
+export async function runCleanup(): Promise<void> {
+  const today = new Date().toISOString().split('T')[0]
+
+  sectionLogger(`🧹 Oh My Workers — Cleanup — ${today}`)
+
+  await cleanupAgent.invoke({
+    messages: [{ role: 'user', content: 'Run the stale data cleanup now.' }],
+  })
+
+  sectionLogger(`✅ Cleanup complete for ${today}`)
+}
+
+// ── Interactive (manual) — requires human at keyboard ─────────────────────────
 export async function runDailyJobs(): Promise<void> {
   const today = new Date().toISOString().split('T')[0]
   const username = process.env.GITHUB_USERNAME

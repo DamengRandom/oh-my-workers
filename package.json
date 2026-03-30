@@ -1,6 +1,6 @@
 {
   "name": "oh-my-workers",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "A personal AI agent that automates daily working tasks at workplace, eg: Cronjobs, KPI reporting and etc",
   "type": "module",
   "main": "index.js",
@@ -8,6 +8,7 @@
     "dev": "node --loader ts-node/esm src/index.ts",
     "setup": "pnpm run dev --setup",
     "start": "pnpm run dev --run",
+    "cleanup": "pnpm run dev --cleanup",
     "tsc": "pnpm exec tsc --noEmit 2>&1",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\""

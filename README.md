@@ -1,8 +1,10 @@
 # Oh My Workers
 
-A personal AI agent that runs every day at 5pm Sydney time to collect your GitHub activity, ask for anything else you did, and generate a daily work KPI report saved to your database.
+A personal AI agent that runs every day at local time scheduled (5pm Sydney time) to collect your GitHub activity, ask for anything else you did, and generate a daily work KPI report saved to your database.
 
 Built with TypeScript, LangChain, and Claude Code.
+
+<b>🥐🥐🥐 This project is using Crontab (macOS) to schedule daily local time scheduled (5pm Sydney time) jobs.</b>
 
 ---
 
@@ -16,7 +18,7 @@ Phase 1 (parallel):
   githubAgent  ──┘
     ↓
 Phase 2 (sequential, interactive):
-  manualKpiAgent  ← waits for your keyboard input
+  manualKpiAgent  ← waits for your keyboard input (to type what did today, part of your KPI report if you need to check on it later on)
     ↓
 Phase 3 (sequential, depends on Phase 1+2):
   diaryAgent  ← receives GitHub + manual data, writes report
@@ -36,7 +38,8 @@ Phase 3 (sequential, depends on Phase 1+2):
 - **TypeScript + Node.js**
 - **LangChain.js** — multi-agent orchestration
 - **Claude (Anthropic)** — AI brain for each agent
-- **node-cron** — daily 5pm Sydney time trigger
+- **crontab (macOS)** — daily 5pm trigger (recommended)
+- **node-cron** — alternative daemon-based trigger
 - **Octokit** — GitHub REST API
 - **Zod** — output schema validation
 - **PostgreSQL** — stores KPI records, diary entries, and cleanup logs
@@ -87,28 +90,90 @@ The app creates all tables automatically on first run.
 
 See **DB Setup** section below for a step-by-step SQL client guide.
 
-### 4. Run
+### 4. Initialize the database (one-time only)
 
-**Project initial setups**
 ```bash
-pnpm run --setup
+pnpm setup
 ```
 
-**Test immediately (skips waiting for 5pm Sydney time):**
-```bash
-pnpm dev --run
-```
+This creates the `kpi`, `diary`, and `cleanup_log` tables. You only need to run this once — tables persist across restarts.
 
-**Run as daily daemon (fires at 5pm Sydney every day):**
+### 5. Test immediately
+
 ```bash
 pnpm start
 ```
 
+Runs all jobs right now and exits. Use this to verify everything works before setting up the daily schedule.
+
+### 6. Automate — run daily at 5pm (macOS crontab)‼️‼️‼️
+
+crontab is the simplest way to trigger the project automatically every day at 5pm without keeping a terminal open. Your Mac just needs to be awake at 5pm.
+
+**Step 1** — Find your pnpm path:
+
+```bash
+which pnpm
+```
+
+**Step 2** — Open your crontab:
+
+```bash
+crontab -e
+```
+
+**Step 3** — Add these two lines (replace the paths with your own):
+
+```bash
+TZ=Australia/Sydney
+0 17 * * * cd /your/project/path && /your/pnpm/path start >> /your/project/path/data/cron.log 2>&1
+```
+
+Example for a typical macOS + Homebrew setup:
+
+```bash
+TZ=Australia/Sydney
+0 17 * * * /opt/homebrew/bin/pnpm --prefix /Users/yourname/projects/oh-my-workers cleanup >> /Users/yourname/projects/oh-my-workers/data/cron.log 2>&1
+```
+
+Save and close. The job is now registered.
+
+> `pnpm cleanup` only runs the **stale data deletion** — no human input needed, safe to run unattended.
+> Run `pnpm start` manually when you are at your laptop to complete the GitHub KPI summary and diary report.
+
+**Step 4** — Verify it was saved:
+
+```bash
+crontab -l
+```
+
+**To check logs after it runs:**
+
+```bash
+cat data/cron.log
+```
+
+**To remove the crontab entry later:**
+
+```bash
+crontab -e   # delete the two lines and save
+```
+
+> **Note:** crontab requires your Mac to be awake at 5pm. If your Mac is asleep, the job is skipped until the next day. For guaranteed daily runs, consider deploying to a cloud server instead.
+
 ---
 
-## DB Setup (TablePlus)
+## Available commands
 
-See the **DB Setup** section in this README for full instructions.
+| Command | Interactive? | What it does |
+|---|---|---|
+| `pnpm setup` | No | One-time DB table creation |
+| `pnpm cleanup` | No | Runs stale data deletion only — used by crontab |
+| `pnpm start` | Yes | Runs GitHub fetch + manual KPI input + diary report |
+| `pnpm dev` | No | Starts long-running daemon (fires at 5pm via node-cron) |
+| `pnpm format` | No | Auto-format all TypeScript files with Prettier |
+| `pnpm format:check` | No | Check formatting without modifying files |
+| `pnpm tsc` | No | TypeScript type check |
 
 ---
 
@@ -194,7 +259,9 @@ COMPANY_DB_URL=postgresql://...new company connection...
 
 No code changes needed.
 
-## Mock test user data for testing (Local environment)
+## Mock test user data for testing (Local environment) - TESTING ONLY Purpose ⚠️⚠️⚠️
+
+Attempt to insert some data for your local postgresql db `mock_company`, to test the project if you like this feature.
 
 ```sql
 psql -h 127.0.0.1 -U damonwu -d mock_company -c "
