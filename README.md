@@ -110,11 +110,17 @@ Runs all jobs right now and exits. Use this to verify everything works before se
 
 crontab is the simplest way to trigger the project automatically every day at 5pm without keeping a terminal open. Your Mac just needs to be awake at 5pm.
 
-**Step 1** — Find your pnpm path:
+**Step 1** — Collect the paths you need:
 
 ```bash
-which pnpm
+which node    # e.g. /Users/yourname/.nvm/versions/node/v22.14.0/bin/node
+which pnpm    # e.g. /opt/homebrew/bin/pnpm
 ```
+
+> **Important — nvm users:** crontab runs with a minimal `PATH` that does not include nvm or Homebrew.
+> If you manage Node.js with nvm, `node` will not be found unless you explicitly add its path.
+> This causes a silent `env: node: No such file or directory` error and the job is skipped.
+> Always set `PATH` as the first line of your crontab (see Step 3).
 
 **Step 2** — Open your crontab:
 
@@ -122,16 +128,18 @@ which pnpm
 crontab -e
 ```
 
-**Step 3** — Add these two lines (replace the paths with your own):
+**Step 3** — Add these three lines (replace paths with your own):
 
-```bash
+```
+PATH=/your/node/bin:/opt/homebrew/bin:/usr/bin:/bin
 TZ=Australia/Sydney
-0 17 * * * cd /your/project/path && /your/pnpm/path start >> /your/project/path/data/cron.log 2>&1
+0 17 * * * /opt/homebrew/bin/pnpm --prefix /your/project/path cleanup >> /your/project/path/data/cron.log 2>&1
 ```
 
-Example for a typical macOS + Homebrew setup:
+Example for nvm + Homebrew on macOS:
 
-```bash
+```
+PATH=/Users/yourname/.nvm/versions/node/v22.14.0/bin:/opt/homebrew/bin:/usr/bin:/bin
 TZ=Australia/Sydney
 0 17 * * * /opt/homebrew/bin/pnpm --prefix /Users/yourname/projects/oh-my-workers cleanup >> /Users/yourname/projects/oh-my-workers/data/cron.log 2>&1
 ```
@@ -147,11 +155,28 @@ Save and close. The job is now registered.
 crontab -l
 ```
 
+**Step 5** — Test it immediately before waiting for 5pm:
+
+```bash
+# Simulate the exact crontab command with the same PATH
+PATH=/your/node/bin:/opt/homebrew/bin:/usr/bin:/bin /opt/homebrew/bin/pnpm --prefix /your/project/path cleanup
+```
+
+If you see `✅ Cleanup complete` in the output, the crontab will work at 5pm.
+
 **To check logs after it runs:**
 
 ```bash
 cat data/cron.log
 ```
+
+**Common errors and fixes:**
+
+| Error in cron.log | Cause | Fix |
+|---|---|---|
+| `env: node: No such file or directory` | nvm node path not in crontab PATH | Add `PATH=...nvm.../bin:...` as first line |
+| `pnpm: command not found` | Homebrew not in crontab PATH | Use full path `/opt/homebrew/bin/pnpm` |
+| `ENOENT .env` | Wrong working directory | Use `--prefix /full/path/to/project` |
 
 **To remove the crontab entry later:**
 
