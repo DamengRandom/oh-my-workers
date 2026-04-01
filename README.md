@@ -1,10 +1,12 @@
 # Oh My Workers
 
-A personal AI agent that runs every day at local time scheduled (5pm Sydney time) to collect your GitHub activity, ask for anything else you did, and generate a daily work KPI report saved to your database.
+A personal AI agent that runs every day at 5pm Sydney time to collect your GitHub activity, ask for anything else you did, and generate a daily work KPI report saved to your database.
 
 Built with TypeScript, LangChain, and Claude Code.
 
-<b>🥐🥐🥐 This project is using Crontab (macOS) to schedule daily local time scheduled (5pm Sydney time) jobs.</b>
+**Two ways to run automatically:**
+- **GitHub Actions + Neon** (recommended) — runs in the cloud, no Mac needed, free
+- **macOS crontab** — runs locally, Mac must be awake at 5pm
 
 ---
 
@@ -38,7 +40,9 @@ Phase 3 (sequential, depends on Phase 1+2):
 - **TypeScript + Node.js**
 - **LangChain.js** — multi-agent orchestration
 - **Claude (Anthropic)** — AI brain for each agent
-- **crontab (macOS)** — daily 5pm trigger (recommended)
+- **GitHub Actions** — daily 5pm cloud cron trigger (recommended)
+- **Neon PostgreSQL** — free cloud database
+- **crontab (macOS)** — alternative local trigger
 - **node-cron** — alternative daemon-based trigger
 - **Octokit** — GitHub REST API
 - **Zod** — output schema validation
@@ -93,8 +97,14 @@ See **DB Setup** section below for a step-by-step SQL client guide.
 ### 4. Initialize the database (one-time only)
 
 ```bash
-pnpm setup
+pnpm run setup
 ```
+
+> **Note:** If using Neon or another remote database, pass the URL inline to avoid modifying `.env`:
+> ```bash
+> DATABASE_URL="postgresql://user:password@host/dbname?sslmode=require" pnpm run setup
+> ```
+> Do NOT include `&channel_binding=require` — the `pg` library doesn't support it and will fail with an auth error.
 
 This creates the `kpi`, `diary`, and `cleanup_log` tables. You only need to run this once — tables persist across restarts.
 
@@ -184,7 +194,51 @@ cat data/cron.log
 crontab -e   # delete the two lines and save
 ```
 
-> **Note:** crontab requires your Mac to be awake at 5pm. If your Mac is asleep, the job is skipped until the next day. For guaranteed daily runs, consider deploying to a cloud server instead.
+> **Note:** crontab requires your Mac to be awake at 5pm. If your Mac is asleep, the job is skipped until the next day. For guaranteed daily runs, use GitHub Actions instead (see below).
+
+---
+
+### 7. Automate — run daily at 5pm via GitHub Actions (recommended, free, no Mac needed)
+
+GitHub Actions runs the cleanup job in the cloud at 5pm Sydney time every day — even if your Mac is off.
+
+**Prerequisites:**
+- Push this repo to GitHub
+- Create a free [Neon](https://neon.tech) account and create two databases: `work_coordinator` and `mock_company` (or your real company DB)
+- Initialize both databases (see Step 4 above)
+
+**Step 1 — Add GitHub repository secrets:**
+
+Go to your repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
+
+| Secret name | Value |
+|---|---|
+| `ANTHROPIC_API_KEY` | your key from console.anthropic.com |
+| `NEON_WORK_COORDINATOR_DB_URL` | Neon connection string for `work_coordinator` (remove `&channel_binding=require`) |
+| `NEON_MOCK_COMPANY_DB_URL` | Neon connection string for your company DB (remove `&channel_binding=require`) |
+| `COMPANY_CLEANUP_TABLE` | table name to clean (e.g. `mockTestUsers`) |
+| `COMPANY_CLEANUP_THRESHOLD_DAYS` | days before a record is considered stale (e.g. `30`) |
+
+> **Important:** When copying connection strings from Neon, remove `&channel_binding=require` from the end.
+> The `pg` library does not support this parameter and will fail with `password authentication failed`.
+
+**Step 2 — Trigger manually to test:**
+
+Go to your repo → **Actions** tab → **Daily Stale Data Cleanup** → **Run workflow** → click the green button.
+
+Watch the logs — it should delete stale records and write to your `cleanup_log` table.
+
+**Step 3 — It runs automatically from now on:**
+
+The workflow file `.github/workflows/cleanup.yml` is already configured with:
+```yaml
+- cron: '0 7 * * *'   # 7:00 AM UTC = 5:00 PM AEST (Sydney)
+```
+
+No further setup needed. Push your code and it runs every day.
+
+> `pnpm cleanup` (what GitHub Actions runs) handles **stale data deletion only** — no human input needed.
+> Run `pnpm start` manually at your laptop for the full GitHub KPI + diary report.
 
 ---
 

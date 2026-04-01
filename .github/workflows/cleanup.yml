@@ -1,0 +1,40 @@
+name: Daily Stale Data Cleanup
+
+on:
+  schedule:
+    # 7:00 AM UTC = 5:00 PM AEST (UTC+10, Apr–Oct)
+    # Note: during AEDT (Oct–Apr, UTC+11) this fires at 6:00 PM Sydney time
+    # Adjust to 0 6 * * * during daylight saving if exact 5pm is needed
+    - cron: '0 7 * * *'
+  workflow_dispatch: # allows manual trigger from GitHub UI
+
+jobs:
+  cleanup:
+    name: Delete stale company records
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run cleanup
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DATABASE_URL: ${{ secrets.NEON_WORK_COORDINATOR_DB_URL }}
+          COMPANY_DB_URL: ${{ secrets.NEON_MOCK_COMPANY_DB_URL }}
+          COMPANY_CLEANUP_TABLE: ${{ secrets.COMPANY_CLEANUP_TABLE }}
+          COMPANY_CLEANUP_THRESHOLD_DAYS: ${{ secrets.COMPANY_CLEANUP_THRESHOLD_DAYS }}
+        run: pnpm cleanup
