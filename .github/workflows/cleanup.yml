@@ -12,6 +12,7 @@ jobs:
   cleanup:
     name: Delete stale company records
     runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.actor == 'DamengRandom'
 
     steps:
       - name: Checkout code

@@ -79,7 +79,7 @@ Edit `.env` and fill in:
 ```env
 ANTHROPIC_API_KEY=        # from console.anthropic.com
 GITHUB_TOKEN=             # from github.com/settings/tokens (read:user, repo scopes)
-GITHUB_USERNAME=           # your GitHub username or email
+TARGET_GITHUB_USERNAME=           # your GitHub username or email
 
 DATABASE_URL=postgresql://postgres:password@localhost:5432/work_coordinator
 
@@ -218,6 +218,7 @@ Go to your repo → **Settings** → **Secrets and variables** → **Actions** �
 | `NEON_MOCK_COMPANY_DB_URL` | Neon connection string for your company DB (remove `&channel_binding=require`) |
 | `COMPANY_CLEANUP_TABLE` | table name to clean (e.g. `mockTestUsers`) |
 | `COMPANY_CLEANUP_THRESHOLD_DAYS` | days before a record is considered stale (e.g. `30`) |
+| `TARGET_GITHUB_USERNAME` | your GitHub username (e.g. `damengrandom`) — used by the KPI report workflow |
 
 Like this (👨‍🍳) -> For Production Only:
 ![alt text](/src/assets/images/github-actions-secrets.png)
@@ -242,6 +243,38 @@ No further setup needed. Push your code and it runs every day.
 
 > `pnpm cleanup` (what GitHub Actions runs) handles **stale data deletion only** — no human input needed.
 > Run `pnpm start` manually at your laptop for the full GitHub KPI + diary report.
+
+---
+
+### 8. Generate your daily KPI report via GitHub Actions (no laptop needed)
+
+You can trigger the full KPI report — GitHub activity fetch + manual activities + diary generation — directly from the GitHub UI or your phone via the GitHub mobile app.
+
+**Step 1 — Add one more secret:**
+
+Go to repo → **Settings** → **Secrets** → **New repository secret**:
+
+| Secret name | Value |
+|---|---|
+| `TARGET_GITHUB_USERNAME` | your GitHub username (e.g. `damengrandom`) |
+
+**Step 2 — Trigger the KPI report:**
+
+Go to your repo → **Actions** tab → **Daily KPI Report** → **Run workflow** → fill in the form:
+
+```
+What did you do today? (comma separated)
+[ Fixed auth bug, Reviewed 3 PRs, Team standup, Wrote docs ]
+```
+
+Click **Run workflow**. It will:
+1. Fetch your GitHub commits and PRs for today
+2. Combine with the activities you typed
+3. Generate a full KPI diary report saved to Neon + markdown
+
+> Leave the input blank if you have nothing to add beyond GitHub activity — the report will still be generated from your commits and PRs.
+
+> Works from your phone via the [GitHub mobile app](https://github.com/mobile) — no laptop needed.
 
 ---
 

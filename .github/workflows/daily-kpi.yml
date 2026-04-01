@@ -1,0 +1,39 @@
+name: Daily KPI Report
+
+on:
+  workflow_dispatch:
+    inputs:
+      activities:
+        description: 'What did you do today? (comma separated, e.g: Fixed auth bug, Reviewed 3 PRs, Team standup)'
+        required: false
+        default: ''
+
+jobs:
+  kpi:
+    name: Generate daily KPI report
+    runs-on: ubuntu-latest
+    if: github.actor == 'DamengRandom'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run daily KPI report
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DATABASE_URL: ${{ secrets.NEON_WORK_COORDINATOR_DB_URL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_GITHUB_USERNAME: ${{ secrets.TARGET_GITHUB_USERNAME }}
+          MANUAL_ACTIVITIES: ${{ github.event.inputs.activities }}
+        run: pnpm start

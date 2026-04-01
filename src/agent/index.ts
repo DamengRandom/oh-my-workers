@@ -21,7 +21,7 @@ export async function runCleanup(): Promise<void> {
 // ── Interactive (manual) — requires human at keyboard ─────────────────────────
 export async function runDailyJobs(): Promise<void> {
   const today = new Date().toISOString().split('T')[0]
-  const username = process.env.GITHUB_USERNAME
+  const username = process.env.TARGET_GITHUB_USERNAME
   const now = new Date().toISOString()
 
   sectionLogger(`🤖 Oh my workers — ${today}`)
