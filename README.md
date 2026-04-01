@@ -100,7 +100,7 @@ See **DB Setup** section below for a step-by-step SQL client guide.
 pnpm run setup
 ```
 
-> **Note:** If using Neon or another remote database, pass the URL inline to avoid modifying `.env`:
+> **Note:** If using Neon or another remote database, pass the URL inline to avoid modifying `.env` (‼️IMPORTANT):
 > ```bash
 > DATABASE_URL="postgresql://user:password@host/dbname?sslmode=require" pnpm run setup
 > ```
@@ -218,6 +218,9 @@ Go to your repo → **Settings** → **Secrets and variables** → **Actions** �
 | `NEON_MOCK_COMPANY_DB_URL` | Neon connection string for your company DB (remove `&channel_binding=require`) |
 | `COMPANY_CLEANUP_TABLE` | table name to clean (e.g. `mockTestUsers`) |
 | `COMPANY_CLEANUP_THRESHOLD_DAYS` | days before a record is considered stale (e.g. `30`) |
+
+Like this (👨‍🍳) -> For Production Only:
+![alt text](/src/assets/images/github-actions-secrets.png)
 
 > **Important:** When copying connection strings from Neon, remove `&channel_binding=require` from the end.
 > The `pg` library does not support this parameter and will fail with `password authentication failed`.

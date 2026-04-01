@@ -1,6 +1,6 @@
 {
   "name": "oh-my-workers",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "A personal AI agent that automates daily working tasks at workplace, eg: Cronjobs, KPI reporting and etc",
   "type": "module",
   "main": "index.js",
