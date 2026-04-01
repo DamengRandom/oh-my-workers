@@ -1,0 +1,34 @@
+name: Daily Mock User Seeding
+
+on:
+  schedule:
+    # 6:30 AM UTC = 4:30 PM AEST (UTC+10, Apr–Oct)
+    # Note: during AEDT (Oct–Apr, UTC+11) this fires at 5:30 PM Sydney time
+    - cron: '30 6 * * *'
+  workflow_dispatch: # allows manual trigger from GitHub UI
+
+jobs:
+  seed:
+    name: Seed random mock users
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Seed mock users
+        env:
+          COMPANY_DB_URL: ${{ secrets.NEON_MOCK_COMPANY_DB_URL }}
+          COMPANY_CLEANUP_TABLE: ${{ secrets.COMPANY_CLEANUP_TABLE }}
+        run: pnpm seed-mock

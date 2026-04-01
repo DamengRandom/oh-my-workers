@@ -10,6 +10,7 @@
     "start": "pnpm run dev --run",
     "cleanup": "pnpm run dev --cleanup",
     "tsc": "pnpm exec tsc --noEmit 2>&1",
+    "seed-mock": "node --loader ts-node/esm src/scripts/seed-mock-users.ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\""
   },
@@ -21,7 +22,10 @@
     "automation",
     "AI agent",
     "langchain",
-    "typescript"
+    "typescript",
+    "neon",
+    "postgresql",
+    "personal assistant"
   ],
   "author": "damengrandom",
   "license": "ISC",
