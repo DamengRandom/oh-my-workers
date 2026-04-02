@@ -18,7 +18,7 @@ export const quizVerifierTool = new DynamicStructuredTool({
     console.log(`${status} — confidence: ${confidence_score}/10`)
 
     if (!approved) {
-      console.log(`  Feedback: ${feedback}`)
+      console.log(`📑 Feedback: ${feedback}`)
     }
 
     return JSON.stringify({ question, answer, explanation, approved, confidence_score, feedback })

@@ -2,478 +2,178 @@
 
 A personal AI agent suite for software engineers. Runs daily jobs automatically via GitHub Actions:
 
-- **5pm Sydney** — collects GitHub activity, asks what else you did, generates a KPI diary report
-- **8am Sydney** — generates a TypeScript coding quiz, verifies it with a second AI reviewer, and emails it to you
+- **5pm Sydney** — fetches GitHub activity, asks what else you did, generates a KPI diary report
+- **8am Sydney** — generates a TypeScript quiz, verifies it with a second AI reviewer, sends via email + Telegram
 
 Built with TypeScript, LangChain, and Claude.
 
-**Two ways to run automatically:**
-- **GitHub Actions + Neon** (recommended) — runs in the cloud, no Mac needed, free
-- **macOS crontab** — runs locally, Mac must be awake at 5pm
-
 ---
 
-## What it does
+## How it works
 
+**KPI pipeline (5pm):**
 ```
-5pm Sydney time
-    ↓
-Phase 1 (parallel):
-  cleanupAgent ──┐  both run at the same time
-  githubAgent  ──┘
-    ↓
-Phase 2 (sequential, interactive):
-  manualKpiAgent  ← waits for your keyboard input (to type what did today, part of your KPI report if you need to check on it later on)
-    ↓
-Phase 3 (sequential, depends on Phase 1+2):
-  diaryAgent  ← receives GitHub + manual data, writes report
+Phase 1 (parallel):  cleanupAgent + githubAgent
+Phase 2 (sequential): manualKpiAgent ← waits for your input
+Phase 3 (sequential): diaryAgent ← writes report from Phase 1+2 data
 ```
 
-| Agent | Job | Runs |
-|---|---|---|
-| `cleanupAgent` | Deletes stale records from company DB (older than 30 days) | Parallel with GitHub |
-| `githubAgent` | Fetches today's commits and PRs from GitHub | Parallel with cleanup |
-| `manualKpiAgent` | Asks you to type in anything GitHub didn't capture | After Phase 1 |
-| `diaryAgent` | Writes daily KPI report, saves to `kpi` and `diary` tables | After Phase 2 |
-
----
-
-### TypeScript Daily Quiz — 8:00 AM Sydney time
-
+**Quiz pipeline (8am):**
 ```
-8am Sydney time
-    ↓
-quizGeneratorAgent  ← Claude generates a TypeScript Q&A (random difficulty)
-    ↓
-quizVerifierAgent   ← Second Claude call reviews for accuracy (confidence >= 8/10)
-    ↓ rejected? regenerate (up to 3 attempts)
-    ↓ approved?
-quizEmailAgent      ← sends formatted HTML email via Gmail SMTP
-    ↓
-Saved to quiz_log table in Neon
+quizGeneratorAgent → quizVerifierAgent (approve if confidence ≥ 8/10, up to 3 attempts)
+    ↓ approved
+quizEmailAgent + quizTelegramAgent (parallel) → saved to quiz_log
 ```
 
-| Agent | Job |
-|---|---|
-| `quizGeneratorAgent` | Generates a TypeScript question + answer + explanation (beginner/intermediate/advanced) |
-| `quizVerifierAgent` | Reviews for technical accuracy — approves only if confidence ≥ 8/10 |
-| `quizEmailAgent` | Sends the approved quiz as a formatted HTML email with dark-themed code blocks |
-
-**Dual-agent verification:** The generator and verifier are two separate Claude calls with different system prompts and temperatures. The generator uses `temperature: 1` for creative variety; the verifier uses `temperature: 0` for strict deterministic review. This catches hallucinations before they reach your inbox.
-
----
-
-## Tech stack
-
-- **TypeScript + Node.js**
-- **LangChain.js** — multi-agent orchestration
-- **Claude (Anthropic)** — AI brain for each agent
-- **GitHub Actions** — daily cloud cron triggers (5pm KPI, 8am quiz)
-- **Neon PostgreSQL** — free cloud database
-- **nodemailer** — Gmail SMTP email delivery for daily quiz
-- **crontab (macOS)** — alternative local trigger
-- **node-cron** — alternative daemon-based trigger
-- **Octokit** — GitHub REST API
-- **Zod** — output schema validation
-- **PostgreSQL** — stores KPI records, diary entries, cleanup logs, and quiz history
-
----
-
-## Prerequisites
-
-- Node.js 18+
-- pnpm
-- PostgreSQL running locally or remotely (see DB Setup below)
-- Anthropic API key
-- GitHub personal access token
+The generator uses `temperature: 1` for variety; the verifier uses `temperature: 0` for strict accuracy. Two separate Claude calls, two different prompts — catches hallucinations before delivery.
 
 ---
 
 ## Setup
 
-### 1. Install dependencies
+### 1. Install
 
 ```bash
 pnpm install
-```
-
-### 2. Configure environment
-
-```bash
 cp .env.example .env
 ```
 
-Edit `.env` and fill in:
+### 2. Configure `.env`
 
 ```env
-ANTHROPIC_API_KEY=            # from console.anthropic.com
-GITHUB_TOKEN=                 # from github.com/settings/tokens (read:user, repo scopes)
-TARGET_GITHUB_USERNAME=       # your GitHub username
+ANTHROPIC_API_KEY=
+GITHUB_TOKEN=                  # github.com/settings/tokens (read:user, repo scopes)
+TARGET_GITHUB_USERNAME=
 
 DATABASE_URL=postgresql://postgres:password@localhost:5432/work_coordinator
-
-# Update these when you change jobs (company-specific database)
 COMPANY_DB_URL=postgresql://user:password@company-host:5432/company_db
 
-# Daily TypeScript quiz — email delivery
+# Quiz — email
 GMAIL_USER=your@gmail.com
 GMAIL_APP_PASSWORD=            # Google Account → Security → 2FA → App Passwords
 QUIZ_EMAIL_RECIPIENT=your@gmail.com
 
-# Daily TypeScript quiz — Telegram delivery
-TELEGRAM_BOT_TOKEN=            # Create bot via @BotFather on Telegram → /newbot
-TELEGRAM_CHAT_ID=              # Your personal chat ID — message @userinfobot to get it
+# Quiz — Telegram
+TELEGRAM_BOT_TOKEN=            # @BotFather on Telegram → /newbot
+TELEGRAM_CHAT_ID=              # message @userinfobot to get your ID, then start your bot first
 ```
 
-> **Gmail App Password:** You must have 2-Step Verification enabled on your Google account first.
-> Then go to myaccount.google.com → search "App passwords" → generate one → paste the 16-character code with no spaces.
-
-> **Telegram Bot setup:**
-> 1. Open Telegram and message `@BotFather` → send `/newbot` → follow prompts → copy the bot token
-> 2. Message `@userinfobot` to get your personal chat ID (the number that starts with your user ID)
-> 3. Start a chat with your new bot first (send it any message) so it can message you
-
-### 3. Create the database
-
-In SQL client (or psql), create a database named `work_coordinator`.
-The app creates all tables automatically on first run.
-
-See **DB Setup** section below for a step-by-step SQL client guide.
-
-### 4. Initialize the database (one-time only)
+### 3. Initialize database
 
 ```bash
 pnpm run setup
 ```
 
-> **Note:** If using Neon or another remote database, pass the URL inline to avoid modifying `.env` (‼️IMPORTANT):
-> ```bash
-> DATABASE_URL="postgresql://user:password@host/dbname?sslmode=require" pnpm run setup
-> ```
-> Do NOT include `&channel_binding=require` — the `pg` library doesn't support it and will fail with an auth error.
+> Using Neon? Pass the URL inline: `DATABASE_URL="postgresql://...?sslmode=require" pnpm run setup`
+> Remove `&channel_binding=require` from Neon URLs — the `pg` library doesn't support it.
 
-This creates the `kpi`, `diary`, and `cleanup_log` tables. You only need to run this once — tables persist across restarts.
-
-### 5. Test immediately
+### 4. Test
 
 ```bash
-pnpm start
+pnpm start   # runs all KPI jobs now
+pnpm quiz    # runs quiz pipeline now
 ```
 
-Runs all jobs right now and exits. Use this to verify everything works before setting up the daily schedule.
+---
 
-### 6. Automate — run daily at 5pm (macOS crontab)‼️‼️‼️
+## Automate via GitHub Actions (recommended)
 
-crontab is the simplest way to trigger the project automatically every day at 5pm without keeping a terminal open. Your Mac just needs to be awake at 5pm.
+Push to GitHub, then add these secrets under **Settings → Secrets and variables → Actions**:
 
-**Step 1** — Collect the paths you need:
+| Secret | Value |
+|---|---|
+| `ANTHROPIC_API_KEY` | from console.anthropic.com |
+| `NEON_WORK_COORDINATOR_DB_URL` | Neon connection string (remove `&channel_binding=require`) |
+| `NEON_MOCK_COMPANY_DB_URL` | Neon connection string for company DB |
+| `COMPANY_CLEANUP_TABLE` | table to clean, e.g. `mockTestUsers` |
+| `COMPANY_CLEANUP_THRESHOLD_DAYS` | stale threshold, e.g. `30` |
+| `TARGET_GITHUB_USERNAME` | your GitHub username |
+| `GMAIL_USER` | your Gmail address |
+| `GMAIL_APP_PASSWORD` | 16-char App Password from Google Account |
+| `QUIZ_EMAIL_RECIPIENT` | email to receive the quiz |
+| `TELEGRAM_BOT_TOKEN` | from @BotFather |
+| `TELEGRAM_CHAT_ID` | from @userinfobot |
 
-```bash
-which node    # e.g. /Users/yourname/.nvm/versions/node/v22.14.0/bin/node
-which pnpm    # e.g. /opt/homebrew/bin/pnpm
-```
+![GitHub Actions secrets](/src/assets/images/github-actions-secrets.png)
 
-> **Important — nvm users:** crontab runs with a minimal `PATH` that does not include nvm or Homebrew.
-> If you manage Node.js with nvm, `node` will not be found unless you explicitly add its path.
-> This causes a silent `env: node: No such file or directory` error and the job is skipped.
-> Always set `PATH` as the first line of your crontab (see Step 3).
+Workflows run automatically. Trigger manually: **Actions** tab → select workflow → **Run workflow**.
 
-**Step 2** — Open your crontab:
+The **Daily KPI Report** workflow has a form — enter comma-separated activities before clicking Run.
+
+---
+
+## Automate locally (macOS crontab)
 
 ```bash
 crontab -e
 ```
 
-**Step 3** — Add these three lines (replace paths with your own):
-
-```
-PATH=/your/node/bin:/opt/homebrew/bin:/usr/bin:/bin
-TZ=Australia/Sydney
-0 17 * * * /opt/homebrew/bin/pnpm --prefix /your/project/path cleanup >> /your/project/path/data/cron.log 2>&1
-```
-
-Example for nvm + Homebrew on macOS:
-
+Add (replace paths with your own):
 ```
 PATH=/Users/yourname/.nvm/versions/node/v22.14.0/bin:/opt/homebrew/bin:/usr/bin:/bin
 TZ=Australia/Sydney
-0 17 * * * /opt/homebrew/bin/pnpm --prefix /Users/yourname/projects/oh-my-workers cleanup >> /Users/yourname/projects/oh-my-workers/data/cron.log 2>&1
+0 17 * * * /opt/homebrew/bin/pnpm --prefix /path/to/project cleanup >> /path/to/project/data/cron.log 2>&1
 ```
 
-Save and close. The job is now registered.
-
-> `pnpm cleanup` only runs the **stale data deletion** — no human input needed, safe to run unattended.
-> Run `pnpm start` manually when you are at your laptop to complete the GitHub KPI summary and diary report.
-
-**Step 4** — Verify it was saved:
-
-```bash
-crontab -l
-```
-
-**Step 5** — Test it immediately before waiting for 5pm:
-
-```bash
-# Simulate the exact crontab command with the same PATH
-PATH=/your/node/bin:/opt/homebrew/bin:/usr/bin:/bin /opt/homebrew/bin/pnpm --prefix /your/project/path cleanup
-```
-
-If you see `✅ Cleanup complete` in the output, the crontab will work at 5pm.
-
-**To check logs after it runs:**
-
-```bash
-cat data/cron.log
-```
-
-**Common errors and fixes:**
-
-| Error in cron.log | Cause | Fix |
-|---|---|---|
-| `env: node: No such file or directory` | nvm node path not in crontab PATH | Add `PATH=...nvm.../bin:...` as first line |
-| `pnpm: command not found` | Homebrew not in crontab PATH | Use full path `/opt/homebrew/bin/pnpm` |
-| `ENOENT .env` | Wrong working directory | Use `--prefix /full/path/to/project` |
-
-**To remove the crontab entry later:**
-
-```bash
-crontab -e   # delete the two lines and save
-```
-
-> **Note:** crontab requires your Mac to be awake at 5pm. If your Mac is asleep, the job is skipped until the next day. For guaranteed daily runs, use GitHub Actions instead (see below).
+> Mac must be awake at 5pm. GitHub Actions is more reliable for unattended runs.
 
 ---
 
-### 7. Automate — run daily at 5pm via GitHub Actions (recommended, free, no Mac needed)
+## Commands
 
-GitHub Actions runs the cleanup job in the cloud at 5pm Sydney time every day — even if your Mac is off.
-
-**Prerequisites:**
-- Push this repo to GitHub
-- Create a free [Neon](https://neon.tech) account and create two databases: `work_coordinator` and `mock_company` (or your real company DB)
-- Initialize both databases (see Step 4 above)
-
-**Step 1 — Add GitHub repository secrets:**
-
-Go to your repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
-
-| Secret name | Value |
+| Command | What it does |
 |---|---|
-| `ANTHROPIC_API_KEY` | your key from console.anthropic.com |
-| `NEON_WORK_COORDINATOR_DB_URL` | Neon connection string for `work_coordinator` (remove `&channel_binding=require`) |
-| `NEON_MOCK_COMPANY_DB_URL` | Neon connection string for your company DB (remove `&channel_binding=require`) |
-| `COMPANY_CLEANUP_TABLE` | table name to clean (e.g. `mockTestUsers`) |
-| `COMPANY_CLEANUP_THRESHOLD_DAYS` | days before a record is considered stale (e.g. `30`) |
-| `TARGET_GITHUB_USERNAME` | your GitHub username (e.g. `damengrandom`) — used by the KPI report workflow |
-| `GMAIL_USER` | your Gmail address (e.g. `you@gmail.com`) |
-| `GMAIL_APP_PASSWORD` | 16-character App Password from Google Account → Security → App Passwords |
-| `QUIZ_EMAIL_RECIPIENT` | email address to receive the daily quiz (can be same as `GMAIL_USER`) |
-| `TELEGRAM_BOT_TOKEN` | bot token from `@BotFather` on Telegram → `/newbot` |
-| `TELEGRAM_CHAT_ID` | your personal chat ID — message `@userinfobot` on Telegram to get it |
-
-Like this (👨‍🍳) -> For Production Only:
-![alt text](/src/assets/images/github-actions-secrets.png)
-
-> **Important:** When copying connection strings from Neon, remove `&channel_binding=require` from the end.
-> The `pg` library does not support this parameter and will fail with `password authentication failed`.
-
-**Step 2 — Trigger manually to test:**
-
-Go to your repo → **Actions** tab → **Daily Stale Data Cleanup** → **Run workflow** → click the green button.
-
-Watch the logs — it should delete stale records and write to your `cleanup_log` table.
-
-**Step 3 — It runs automatically from now on:**
-
-The workflow file `.github/workflows/cleanup.yml` is already configured with:
-```yaml
-- cron: '0 7 * * *'   # 7:00 AM UTC = 5:00 PM AEST (Sydney)
-```
-
-No further setup needed. Push your code and it runs every day.
-
-> `pnpm cleanup` (what GitHub Actions runs) handles **stale data deletion only** — no human input needed.
-> Run `pnpm start` manually at your laptop for the full GitHub KPI + diary report.
-
----
-
-### 8. Generate your daily KPI report via GitHub Actions (no laptop needed)
-
-You can trigger the full KPI report — GitHub activity fetch + manual activities + diary generation — directly from the GitHub UI or your phone via the GitHub mobile app.
-
-**Step 1 — Add one more secret:**
-
-Go to repo → **Settings** → **Secrets** → **New repository secret**:
-
-| Secret name | Value |
-|---|---|
-| `TARGET_GITHUB_USERNAME` | your GitHub username (e.g. `damengrandom`) |
-
-**Step 2 — Trigger the KPI report:**
-
-Go to your repo → **Actions** tab → **Daily KPI Report** → **Run workflow** → fill in the form:
-
-```
-What did you do today? (comma separated)
-[ Fixed auth bug, Reviewed 3 PRs, Team standup, Wrote docs ]
-```
-
-Click **Run workflow**. It will:
-1. Fetch your GitHub commits and PRs for today
-2. Combine with the activities you typed
-3. Generate a full KPI diary report saved to Neon + markdown
-
-> Leave the input blank if you have nothing to add beyond GitHub activity — the report will still be generated from your commits and PRs.
-
-> Works from your phone via the [GitHub mobile app](https://github.com/mobile) — no laptop needed.
-
----
-
-## Available commands
-
-| Command | Interactive? | What it does |
-|---|---|---|
-| `pnpm setup` | No | One-time DB table creation (creates all tables including `quiz_log`) |
-| `pnpm cleanup` | No | Runs stale data deletion only — used by crontab |
-| `pnpm start` | Yes | Runs GitHub fetch + manual KPI input + diary report |
-| `pnpm quiz` | No | Generates, verifies, and emails today's TypeScript quiz |
-| `pnpm dev` | No | Starts long-running daemon (fires at 5pm via node-cron) |
-| `pnpm seed-mock` | No | Seeds expired mock users into company DB for testing |
-| `pnpm format` | No | Auto-format all TypeScript files with Prettier |
-| `pnpm format:check` | No | Check formatting without modifying files |
-| `pnpm tsc` | No | TypeScript type check |
+| `pnpm run setup` | One-time DB table creation |
+| `pnpm cleanup` | Stale data deletion only (used by crontab) |
+| `pnpm start` | GitHub fetch + manual KPI input + diary report |
+| `pnpm quiz` | Generate, verify, and send today's TypeScript quiz |
+| `pnpm dev` | Long-running daemon (fires at 5pm via node-cron) |
+| `pnpm seed-mock` | Seed expired mock users into company DB |
+| `pnpm format` | Auto-format with Prettier |
+| `pnpm tsc` | TypeScript type check |
 
 ---
 
 ## Project structure
 
 ```
-work-coordinator/
-├── src/
-│   ├── agent/
-│   │   ├── index.ts                # WorkCoordinator class — orchestrates all agents
-│   │   ├── cleanup.agent.ts        # Stale data cleanup agent
-│   │   ├── github.agent.ts         # GitHub activity agent
-│   │   ├── manual-kpi.agent.ts     # Manual input agent
-│   │   ├── diary.agent.ts          # KPI report writer agent
-│   │   ├── quiz-generator.agent.ts # TypeScript quiz generator agent
-│   │   ├── quiz-verifier.agent.ts  # Quiz accuracy verifier agent
-│   │   ├── quiz-email.agent.ts     # Quiz email delivery agent
-│   │   └── prompt.ts               # System prompts for all agents
-│   ├── tools/
-│   │   ├── github.tool.ts          # Octokit GitHub API tool
-│   │   ├── cleanup.tool.ts         # Company DB cleanup tool
-│   │   ├── manual-kpi.tool.ts      # Readline prompt tool (CI: reads env var)
-│   │   ├── diary.tool.ts           # Save report to DB + markdown
-│   │   ├── quiz-generator.tool.ts  # Generate TypeScript Q&A
-│   │   ├── quiz-verifier.tool.ts   # Review Q&A for accuracy
-│   │   └── quiz-email.tool.ts      # Send quiz via Gmail SMTP
-│   ├── jobs/
-│   │   └── scheduler.ts            # node-cron schedules (5pm KPI, 8am quiz)
-│   ├── storage/
-│   │   ├── own-db.ts               # PostgreSQL queries (own DB: kpi, diary, quiz_log)
-│   │   └── company-db.ts           # PostgreSQL queries (company DB cleanup)
-│   ├── schemas/
-│   │   └── index.ts                # Zod schemas for all data structures
-│   ├── scripts/
-│   │   └── seed-mock-users.ts      # Seed expired mock users for testing
-│   ├── utils/
-│   │   └── logger.ts               # Section logger utility
-│   ├── constants/
-│   │   └── index.ts                # App-wide constants
-│   └── index.ts                    # Entry point — CLI flag handling
-├── .github/
-│   └── workflows/
-│       ├── cleanup.yml             # Daily 5pm cleanup (GitHub Actions)
-│       ├── daily-kpi.yml           # Manual KPI report trigger
-│       ├── seed-mock-users.yml     # Daily 4:30pm mock data seeding
-│       └── morning-quiz.yml        # Daily 8am TypeScript quiz
-├── data/                           # Local environment only
-│   ├── todos.md                    # Job definitions (human-readable)
-│   └── diary/                      # Generated daily markdown reports
-├── .env.example
-└── README.md
+src/
+├── agent/
+│   ├── index.ts                # WorkCoordinator — orchestrates all agents
+│   ├── prompt.ts               # System prompts for all agents
+│   ├── cleanup.agent.ts
+│   ├── github.agent.ts
+│   ├── manual-kpi.agent.ts
+│   ├── diary.agent.ts
+│   ├── quiz-generator.agent.ts
+│   ├── quiz-verifier.agent.ts
+│   ├── quiz-email.agent.ts
+│   └── quiz-telegram.agent.ts
+├── tools/                      # DynamicStructuredTool implementations
+├── jobs/scheduler.ts           # node-cron schedules
+├── storage/                    # PostgreSQL queries (own-db + company-db)
+├── schemas/index.ts            # Zod schemas
+└── index.ts                    # Entry point + CLI flags
+.github/workflows/
+├── cleanup.yml                 # Daily 5pm cleanup
+├── daily-kpi.yml               # Manual KPI trigger (workflow_dispatch)
+├── seed-mock-users.yml         # Daily 4:30pm mock data seeding
+└── morning-quiz.yml            # Daily 8am TypeScript quiz
 ```
 
 ---
 
 ## Database tables
 
-### `kpi` — daily GitHub activity records
-| Column | Type | Description |
-|---|---|---|
-| id | SERIAL | Primary key |
-| github_summary | TEXT | AI-written summary of GitHub activity |
-| commits_count | INTEGER | Number of commits today |
-| prs_count | INTEGER | Number of PRs today |
-| activities | TEXT[] | Manual activities you entered |
-| created_at | TIMESTAMPTZ | When the record was created |
-| updated_at | TIMESTAMPTZ | When the record was last updated |
-
-### `diary` — daily KPI reports
-| Column | Type | Description |
-|---|---|---|
-| id | SERIAL | Primary key |
-| content | TEXT | Full AI-generated KPI report |
-| created_at | TIMESTAMPTZ | When the report was created |
-| updated_at | TIMESTAMPTZ | When the report was last updated |
-
-### `cleanup_log` — company DB cleanup history
-| Column | Type | Description |
-|---|---|---|
-| id | SERIAL | Primary key |
-| company_table | TEXT | Which table was cleaned |
-| deleted_count | INTEGER | How many records were deleted |
-| failed_count | INTEGER | How many deletions failed |
-| status | TEXT | success / partial / failed |
-| errors | TEXT[] | Error messages if any |
-| created_at | TIMESTAMPTZ | When the cleanup ran |
-| updated_at | TIMESTAMPTZ | — |
+| Table | Description |
+|---|---|
+| `kpi` | Daily GitHub activity records (commits, PRs, manual activities) |
+| `diary` | AI-generated daily KPI reports |
+| `cleanup_log` | Company DB cleanup history (deleted count, errors) |
+| `quiz_log` | Quiz history (question, answer, approved, sent flags) |
 
 ---
 
 ## Changing companies
 
-When you change jobs, update three lines in `.env`:
-
-```env
-COMPANY_DB_URL=postgresql://...new company connection...
-```
-
-No code changes needed.
-
-## Mock test user data for testing (Local environment) - TESTING ONLY Purpose ⚠️⚠️⚠️
-
-Attempt to insert some data for your local postgresql db `mock_company`, to test the project if you like this feature.
-
-```sql
-psql -h 127.0.0.1 -U damonwu -d mock_company -c "
-  INSERT INTO \"mockTestUsers\" (username, email, phone, address, gender, created_at, updated_at) VALUES
-    ('fresh_user_1', 'fresh1@test.com', '0411111111', '1 George St, Sydney', 'male',   NOW() - INTERVAL '1 day',  NOW() - INTERVAL '1 day'),
-    ('fresh_user_2', 'fresh2@test.com', '0422222222', '2 Pitt St, Sydney',   'female', NOW() - INTERVAL '3 days', NOW() - INTERVAL '3 days'),
-    ('fresh_user_3', 'fresh3@test.com', NULL,         '3 Kent St, Sydney',   'male',   NOW() - INTERVAL '5 days', NOW() - INTERVAL '5 days'),
-    ('fresh_user_4', 'fresh4@test.com', '0444444444', '4 Park St, Sydney',   'female', NOW() - INTERVAL '7 days', NOW() - INTERVAL '7 days'),
-    ('fresh_user_5', 'fresh5@test.com', '0455555555', '5 York St, Sydney',   'male',   NOW() - INTERVAL '10 days',NOW() - INTERVAL '10 days'),
-    ('fresh_user_6', 'fresh6@test.com', NULL,         '6 King St, Sydney',   'female', NOW() - INTERVAL '14 days',NOW() - INTERVAL '14 days'),
-    ('fresh_user_7', 'fresh7@test.com', '0477777777', '7 Queen St, Sydney',  'male',   NOW() - INTERVAL '20 days',NOW() - INTERVAL '20 days'),
-    ('fresh_user_8', 'fresh8@test.com', '0488888888', '8 Market St, Sydney', 'female', NOW() - INTERVAL '25 days',NOW() - INTERVAL '25 days'),
-    ('fresh_user_9', 'fresh9@test.com', NULL,         '9 Bridge St, Sydney', 'male',   NOW() - INTERVAL '28 days',NOW() - INTERVAL '28 days'),
-    ('fresh_user_10','fresh10@test.com','0410101010', '10 Macquarie St, Sydney','female',NOW() - INTERVAL '29 days',NOW() - INTERVAL '29 days'),
-    ('expired_user_1', 'expired1@test.com', '0411000001', '1 Old Rd, Melbourne',  'male',   NOW() - INTERVAL '31 days', NOW() - INTERVAL '31 days'),
-    ('expired_user_2', 'expired2@test.com', NULL,         '2 Old Rd, Melbourne',  'female', NOW() - INTERVAL '35 days', NOW() - INTERVAL '35 days'),
-    ('expired_user_3', 'expired3@test.com', '0433000003', '3 Old Rd, Melbourne',  'male',   NOW() - INTERVAL '40 days', NOW() - INTERVAL '40 days'),
-    ('expired_user_4', 'expired4@test.com', '0444000004', '4 Old Rd, Melbourne',  'female', NOW() - INTERVAL '45 days', NOW() - INTERVAL '45 days'),
-    ('expired_user_5', 'expired5@test.com', NULL,         '5 Old Rd, Melbourne',  'male',   NOW() - INTERVAL '50 days', NOW() - INTERVAL '50 days'),
-    ('expired_user_6', 'expired6@test.com', '0466000006', '6 Old Rd, Melbourne',  'female', NOW() - INTERVAL '60 days', NOW() - INTERVAL '60 days'),
-    ('expired_user_7', 'expired7@test.com', '0477000007', '7 Old Rd, Melbourne',  'male',   NOW() - INTERVAL '75 days', NOW() - INTERVAL '75 days'),
-    ('expired_user_8', 'expired8@test.com', NULL,         '8 Old Rd, Melbourne',  'female', NOW() - INTERVAL '90 days', NOW() - INTERVAL '90 days'),
-    ('expired_user_9', 'expired9@test.com', '0499000009', '9 Old Rd, Melbourne',  'male',   NOW() - INTERVAL '120 days',NOW() - INTERVAL '120 days'),
-    ('expired_user_10','expired10@test.com','0410000010','10 Old Rd, Melbourne',  'female', NOW() - INTERVAL '180 days',NOW() - INTERVAL '180 days');
-
-  SELECT
-    COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days') AS fresh_count,
-    COUNT(*) FILTER (WHERE created_at <  NOW() - INTERVAL '30 days') AS expired_count,
-    COUNT(*) AS total
-  FROM \"mockTestUsers\";
-"
-```
+Update `COMPANY_DB_URL` in `.env`. No code changes needed.
