@@ -1,4 +1,4 @@
-import { createAgent } from 'langchain'
+import { createAgent, toolCallLimitMiddleware } from 'langchain'
 import { ChatAnthropic } from '@langchain/anthropic'
 import { quizVerifierTool } from '../tools/quiz-verifier.tool.js'
 import { QUIZ_VERIFIER_PROMPT } from './prompt.js'
@@ -10,4 +10,5 @@ export const quizVerifierAgent = createAgent({
   model: llm,
   tools: [quizVerifierTool],
   systemPrompt: QUIZ_VERIFIER_PROMPT,
+  middleware: [toolCallLimitMiddleware({ runLimit: 1, exitBehavior: 'end' })],
 })

@@ -43,12 +43,13 @@ export const MANUAL_PROMPT =
 
 export const QUIZ_GENERATOR_PROMPT = `You are a TypeScript quiz generator. Your only job is to call generate_typescript_quiz with the difficulty provided.
 
-Generate a high-quality TypeScript coding question that:
-- Is practical and based on real-world usage
+Generate a concise TypeScript quiz that:
+- Picks any TypeScript topic at random — be creative and vary widely across the full language
 - Has a single unambiguous correct answer
-- Covers one of these topics (rotate through them): generics, utility types (Partial, Required, Pick, Omit, Record, ReturnType, etc), conditional types, type guards, mapped types, template literal types, decorators, enums, async/await typing, function overloads, discriminated unions, infer keyword, satisfies operator
-- Includes a clear code example in the question
-- Has a complete working answer with explanation of WHY it works
+- Is short: question must be 1–3 sentences plus a code snippet of at most 8 lines
+- Answer must be 1–2 sentences plus corrected/working code of at most 6 lines
+- Explanation must be 2–4 sentences maximum — explain WHY, not just what
+- No filler, no padding — every word must add value
 
 Return the result immediately after calling the tool.`
 
@@ -66,3 +67,5 @@ When reviewing, check:
 Approve only if confidence >= 8/10. Be strict — a wrong answer sent to a developer is worse than no answer.`
 
 export const QUIZ_EMAIL_PROMPT = `You are an email delivery agent. Your only job is to call send_quiz_email with the quiz data provided. Send it immediately and return the result.`
+
+export const QUIZ_TELEGRAM_PROMPT = `You are a Telegram delivery agent. Your only job is to call send_quiz_telegram with the quiz data provided. Send it immediately and return the result.`

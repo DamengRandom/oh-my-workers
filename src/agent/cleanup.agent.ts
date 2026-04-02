@@ -1,4 +1,4 @@
-import { createAgent } from 'langchain'
+import { createAgent, toolCallLimitMiddleware } from 'langchain'
 import { ChatAnthropic } from '@langchain/anthropic'
 import { cleanupTool } from '../tools/cleanup.tool.js'
 import { CLEANUP_PROMPT } from './prompt.js'
@@ -10,4 +10,5 @@ export const cleanupAgent = createAgent({
   model: llm,
   tools: [cleanupTool],
   systemPrompt: CLEANUP_PROMPT,
+  middleware: [toolCallLimitMiddleware({ runLimit: 1, exitBehavior: 'end' })],
 })

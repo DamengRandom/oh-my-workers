@@ -1,4 +1,4 @@
-import { createAgent } from 'langchain'
+import { createAgent, toolCallLimitMiddleware } from 'langchain'
 import { ChatAnthropic } from '@langchain/anthropic'
 import { quizGeneratorTool } from '../tools/quiz-generator.tool.js'
 import { QUIZ_GENERATOR_PROMPT } from './prompt.js'
@@ -10,4 +10,5 @@ export const quizGeneratorAgent = createAgent({
   model: llm,
   tools: [quizGeneratorTool],
   systemPrompt: QUIZ_GENERATOR_PROMPT,
+  middleware: [toolCallLimitMiddleware({ runLimit: 1, exitBehavior: 'end' })],
 })

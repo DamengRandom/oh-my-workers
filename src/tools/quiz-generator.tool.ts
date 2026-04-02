@@ -6,10 +6,10 @@ export const quizGeneratorTool = new DynamicStructuredTool({
   description: 'Generates a TypeScript coding question with a complete answer and explanation at the specified difficulty level.',
   schema: z.object({
     difficulty: z.enum(['beginner', 'intermediate', 'advanced']).describe('Difficulty level of the quiz question'),
-    topic: z.string().describe('TypeScript topic to focus on, e.g. generics, utility types, type guards'),
-    question: z.string().describe('The quiz question with a code example'),
-    answer: z.string().describe('The complete correct answer including working code'),
-    explanation: z.string().describe('Clear explanation of why the answer is correct and how it works'),
+    topic: z.string().describe('TypeScript topic covered, e.g. generics, enums, infer keyword'),
+    question: z.string().describe('Short quiz question: 1–3 sentences + code snippet max 8 lines'),
+    answer: z.string().describe('Correct answer: 1–2 sentences + working code max 6 lines'),
+    explanation: z.string().describe('Why the answer is correct: 2–4 sentences max, no padding'),
   }),
   func: async ({ difficulty, topic, question, answer, explanation }) => {
     const now = new Date().toISOString()

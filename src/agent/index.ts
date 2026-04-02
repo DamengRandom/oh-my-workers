@@ -5,6 +5,7 @@ import { diaryAgent } from './diary.agent.js'
 import { quizGeneratorAgent } from './quiz-generator.agent.js'
 import { quizVerifierAgent } from './quiz-verifier.agent.js'
 import { quizEmailAgent } from './quiz-email.agent.js'
+import { quizTelegramAgent } from './quiz-telegram.agent.js'
 import { saveKpiRecord, saveQuizLog } from '../storage/own-db.js'
 import { sectionLogger } from '../utils/logger.js'
 
@@ -14,7 +15,17 @@ export class WorkCoordinator {
   // ── Shared helper ────────────────────────────────────────────────────────────
   private static toolOutput(result: AgentResult, toolName: string): string {
     const msg = result.messages.find((m) => m._getType?.() === 'tool' && (m as { name?: string }).name === toolName)
-    return `${msg?.content ?? ''}`
+    if (!msg) return ''
+
+    const content = msg.content
+
+    // LangChain sometimes returns content as an array of content blocks
+    if (Array.isArray(content)) {
+      const block = content.find((c: unknown) => typeof c === 'object' && c !== null && (c as { type?: string }).type === 'text')
+      return block ? (block as { text: string }).text : JSON.stringify(content)
+    }
+
+    return `${content ?? ''}`
   }
 
   // ── Automated (crontab) — no human input required ─────────────────────────
@@ -138,6 +149,9 @@ export class WorkCoordinator {
     // ── Step 2: Verify (up to 3 attempts) ──────────────────────────────────
     console.log('⚡️ Verifying quiz accuracy...\n')
 
+    let parseErrorCount = 0
+    const MAX_PARSE_ERRORS = 3
+
     for (let attempt = 1; attempt <= 3; attempt++) {
       const verifyResult = await quizVerifierAgent.invoke({
         messages: [
@@ -151,9 +165,20 @@ export class WorkCoordinator {
       let verdict: { approved: boolean; feedback: string; confidence_score: number } | null = null
 
       try {
-        verdict = JSON.parse(WorkCoordinator.toolOutput(verifyResult, 'verify_typescript_quiz'))
-      } catch {
-        console.error(`❌ Failed to parse verifier result on attempt ${attempt}`)
+        const raw = WorkCoordinator.toolOutput(verifyResult, 'verify_typescript_quiz')
+        verdict = JSON.parse(raw)
+      } catch (err) {
+        parseErrorCount++
+        
+        console.error(`❌ Failed to parse verifier result on attempt ${attempt} (parse error ${parseErrorCount}/${MAX_PARSE_ERRORS}):`, err instanceof Error ? err.message : err)
+        
+        if (parseErrorCount >= MAX_PARSE_ERRORS) {
+          console.error('❌ Too many parse errors — aborting verification.')
+          break
+        }
+        
+        attempt-- // retry verification without consuming an attempt
+        
         continue
       }
 
@@ -182,22 +207,24 @@ export class WorkCoordinator {
       }
     }
 
-    // ── Step 3: Send email if approved ─────────────────────────────────────
+    // ── Step 3: Send via email + Telegram in parallel if approved ──────────
     if (approved && quiz) {
-      console.log('\n⚡️ Sending quiz via email...\n')
+      console.log('\n⚡️ Sending quiz via email and Telegram...\n')
 
-      await quizEmailAgent.invoke({
-        messages: [
-          {
-            role: 'user',
-            content: `Send this TypeScript quiz via email now.\n\nQuestion: ${quiz.question}\n\nAnswer: ${quiz.answer}\n\nExplanation: ${quiz.explanation}\n\nDifficulty: ${quiz.difficulty}\n\nTopic: ${quiz.topic}\n\nVerifier feedback: ${feedback}`,
-          },
-        ],
-      })
+      const quizContent = `Question: ${quiz.question}\n\nAnswer: ${quiz.answer}\n\nExplanation: ${quiz.explanation}\n\nDifficulty: ${quiz.difficulty}\n\nTopic: ${quiz.topic}\n\nVerifier feedback: ${feedback}`
+
+      await Promise.all([
+        quizEmailAgent.invoke({
+          messages: [{ role: 'user', content: `Send this TypeScript quiz via email now.\n\n${quizContent}` }],
+        }),
+        quizTelegramAgent.invoke({
+          messages: [{ role: 'user', content: `Send this TypeScript quiz via Telegram now.\n\n${quizContent}` }],
+        }),
+      ])
 
       sent = true
     } else {
-      console.log('\n⏭️ Quiz rejected after 3 attempts — skipping email.\n')
+      console.log('\n⏭️ Quiz rejected after 3 attempts — skipping email and Telegram.\n')
     }
 
     // ── Step 4: Save to DB ──────────────────────────────────────────────────
