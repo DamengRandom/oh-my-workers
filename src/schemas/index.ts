@@ -60,6 +60,23 @@ export const CleanupResultSchema = z.object({
   updated_at: z.string(),
 })
 
+// --- TypeScript Quiz ---
+export const QuizSchema = z.object({
+  question: z.string(),
+  answer: z.string(),
+  explanation: z.string(),
+  difficulty: z.enum(['beginner', 'intermediate', 'advanced']),
+  topic: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+})
+
+export const QuizLogSchema = QuizSchema.extend({
+  approved: z.boolean(),
+  feedback: z.string(),
+  sent: z.boolean(),
+})
+
 // TypeScript types inferred from schemas
 export type GitHubDigest = z.infer<typeof GitHubDigestSchema>
 export type GithubKpiInput = z.infer<typeof GithubKpiInputSchema>
@@ -67,3 +84,5 @@ export type ManualKpiInput = z.infer<typeof ManualKpiInputSchema>
 export type KpiRecord = z.infer<typeof KpiRecordSchema>
 export type DiaryEntry = z.infer<typeof DiaryEntrySchema>
 export type CleanupResult = z.infer<typeof CleanupResultSchema>
+export type Quiz = z.infer<typeof QuizSchema>
+export type QuizLog = z.infer<typeof QuizLogSchema>

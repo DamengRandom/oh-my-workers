@@ -10,6 +10,7 @@
     "start": "pnpm run dev --run",
     "cleanup": "pnpm run dev --cleanup",
     "tsc": "pnpm exec tsc --noEmit 2>&1",
+    "quiz": "pnpm run dev --quiz",
     "seed-mock": "node --loader ts-node/esm src/scripts/seed-mock-users.ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\""
@@ -38,12 +39,14 @@
     "dotenv": "^17.3.1",
     "langchain": "^1.2.37",
     "node-cron": "^4.2.1",
+    "nodemailer": "^8.0.4",
     "pg": "^8.20.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
     "@types/node-cron": "^3.0.11",
+    "@types/nodemailer": "^7.0.11",
     "@types/pg": "^8.20.0",
     "prettier": "^3.8.1",
     "ts-node": "^10.9.2",

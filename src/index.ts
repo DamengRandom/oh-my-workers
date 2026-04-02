@@ -1,7 +1,7 @@
 import 'dotenv/config'
 import { initDb } from './storage/own-db.js'
 import { startScheduler } from './jobs/scheduler.js'
-import { runDailyJobs, runCleanup } from './agent/index.js'
+import { runDailyJobs, runCleanup, runQuizAgent } from './agent/index.js'
 
 async function main(): Promise<void> {
   // One-time DB setup: pnpm setup
@@ -20,6 +20,12 @@ async function main(): Promise<void> {
   // Interactive KPI jobs — run manually when at laptop: pnpm start
   if (process.argv.includes('--run')) {
     await runDailyJobs()
+    process.exit(0)
+  }
+
+  // Daily TypeScript quiz — generate, verify, email: pnpm quiz
+  if (process.argv.includes('--quiz')) {
+    await runQuizAgent()
     process.exit(0)
   }
 

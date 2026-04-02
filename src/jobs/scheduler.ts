@@ -1,6 +1,6 @@
 import cron from 'node-cron'
-import { runDailyJobs } from '../agent/index.js'
-import { DEFAULT_CRONJOB_TIME, DEFAULT_CRONJOB_TIMEZONE } from '../constants/index.js'
+import { runDailyJobs, runQuizAgent } from '../agent/index.js'
+import { DEFAULT_CRONJOB_TIME, DEFAULT_CRONJOB_TIMEZONE, QUIZ_CRON_TIME } from '../constants/index.js'
 
 export function startScheduler(): void {
   // Runs every day at 5:00pm Sydney time
@@ -17,5 +17,17 @@ export function startScheduler(): void {
     { timezone: DEFAULT_CRONJOB_TIMEZONE }
   )
 
-  console.log(`⏰ Scheduler started — daily jobs will run at ${DEFAULT_CRONJOB_TIME} ${DEFAULT_CRONJOB_TIMEZONE}`)
+  cron.schedule(
+    QUIZ_CRON_TIME,
+    async () => {
+      try {
+        await runQuizAgent()
+      } catch (err) {
+        console.error('❌ Quiz job failed:', err)
+      }
+    },
+    { timezone: DEFAULT_CRONJOB_TIMEZONE }
+  )
+
+  console.log(`⏰ Scheduler started — daily jobs at ${DEFAULT_CRONJOB_TIME}, quiz at ${QUIZ_CRON_TIME} (${DEFAULT_CRONJOB_TIMEZONE})`)
 }
