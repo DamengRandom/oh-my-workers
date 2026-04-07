@@ -7,6 +7,8 @@ A personal AI agent suite for software engineers. Runs daily jobs automatically 
 
 Built with TypeScript, LangChain, and Claude.
 
+<video src="src/assets/videos/oh-my-workers-brief.mp4" width="600" controls></video>
+
 ---
 
 ## How it works
