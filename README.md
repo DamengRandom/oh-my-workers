@@ -7,7 +7,7 @@ A personal AI agent suite for software engineers. Runs daily jobs automatically 
 
 Built with TypeScript, LangChain, and Claude.
 
-<video src="https://1qa33vobhw.ucarecd.net/f61ac3b2-3d3f-4b21-86b2-7cf8c3beb2a5/" width="600" height="360" controls></video>
+<video src="https://github.com/user-attachments/assets/1c37e4f1-4a8a-4100-8a07-9cedfa7e745f" width="600" height="360" controls></video>
 
 ---
 
