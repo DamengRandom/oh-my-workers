@@ -1,7 +1,7 @@
 import 'dotenv/config'
 import { initDb } from './storage/own-db.js'
 import { startScheduler } from './jobs/scheduler.js'
-import { runDailyJobs, runCleanup, runQuizAgent } from './agent/index.js'
+import { runDailyJobs, runCleanup, runNewsAgent } from './agent/index.js'
 
 async function main(): Promise<void> {
   // One-time DB setup: pnpm setup
@@ -23,9 +23,9 @@ async function main(): Promise<void> {
     process.exit(0)
   }
 
-  // Daily TypeScript quiz — generate, verify, email: pnpm quiz
-  if (process.argv.includes('--quiz')) {
-    await runQuizAgent()
+  // Daily AI news — search, curate, send via Telegram: pnpm news
+  if (process.argv.includes('--news')) {
+    await runNewsAgent()
     process.exit(0)
   }
 

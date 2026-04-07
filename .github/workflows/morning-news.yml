@@ -1,4 +1,4 @@
-name: Daily TypeScript Quiz
+name: Daily AI News
 
 on:
   schedule:
@@ -8,8 +8,8 @@ on:
   workflow_dispatch: # allows manual trigger from GitHub UI
 
 jobs:
-  quiz:
-    name: Generate and send TypeScript quiz
+  news:
+    name: Search and send AI news digest
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule' || github.actor == 'DamengRandom'
 
@@ -28,13 +28,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Run quiz agent
+      - name: Run news agent
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           DATABASE_URL: ${{ secrets.NEON_WORK_COORDINATOR_DB_URL }}
-          GMAIL_USER: ${{ secrets.GMAIL_USER }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-          QUIZ_EMAIL_RECIPIENT: ${{ secrets.QUIZ_EMAIL_RECIPIENT }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: pnpm quiz
+        run: pnpm news

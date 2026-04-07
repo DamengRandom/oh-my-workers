@@ -1,5 +1,5 @@
 import { Pool } from 'pg'
-import type { KpiRecord, DiaryEntry, CleanupResult, QuizLog } from '../schemas/index.js'
+import type { KpiRecord, DiaryEntry, CleanupResult, AiNewsLog } from '../schemas/index.js'
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 
@@ -35,18 +35,14 @@ export async function initDb(): Promise<void> {
       updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
-    CREATE TABLE IF NOT EXISTS quiz_log (
-      id          SERIAL PRIMARY KEY,
-      question    TEXT    NOT NULL,
-      answer      TEXT    NOT NULL,
-      explanation TEXT    NOT NULL,
-      difficulty  TEXT    NOT NULL,
-      topic       TEXT    NOT NULL,
-      approved    BOOLEAN NOT NULL DEFAULT false,
-      feedback    TEXT    NOT NULL DEFAULT '',
-      sent        BOOLEAN NOT NULL DEFAULT false,
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    CREATE TABLE IF NOT EXISTS ai_news (
+      id         SERIAL PRIMARY KEY,
+      title      TEXT    NOT NULL,
+      url        TEXT    NOT NULL,
+      summary    TEXT    NOT NULL,
+      sent       BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `)
   console.log('✅ Own database tables ready')
@@ -74,12 +70,14 @@ export async function saveCleanupLog(result: CleanupResult, tableName: string): 
   )
 }
 
-export async function saveQuizLog(log: QuizLog): Promise<void> {
-  await pool.query(
-    `INSERT INTO quiz_log (question, answer, explanation, difficulty, topic, approved, feedback, sent, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-    [log.question, log.answer, log.explanation, log.difficulty, log.topic, log.approved, log.feedback, log.sent, log.created_at, log.updated_at]
-  )
+export async function saveAiNews(articles: AiNewsLog[]): Promise<void> {
+  for (const article of articles) {
+    await pool.query(
+      `INSERT INTO ai_news (title, url, summary, sent, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [article.title, article.url, article.summary, article.sent, article.created_at, article.updated_at]
+    )
+  }
 }
 
 // ─── Teardown ─────────────────────────────────────────────────────────────────

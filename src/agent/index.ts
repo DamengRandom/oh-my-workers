@@ -2,11 +2,10 @@ import { cleanupAgent } from './cleanup.agent.js'
 import { githubAgent } from './github.agent.js'
 import { manualKpiAgent } from './manual-kpi.agent.js'
 import { diaryAgent } from './diary.agent.js'
-import { quizGeneratorAgent } from './quiz-generator.agent.js'
-import { quizVerifierAgent } from './quiz-verifier.agent.js'
-import { quizEmailAgent } from './quiz-email.agent.js'
-import { quizTelegramAgent } from './quiz-telegram.agent.js'
-import { saveKpiRecord, saveQuizLog } from '../storage/own-db.js'
+import { newsSearchAgent } from './news-search.agent.js'
+import { newsCuratorAgent } from './news-curator.agent.js'
+import { newsTelegramAgent } from './news-telegram.agent.js'
+import { saveKpiRecord, saveAiNews } from '../storage/own-db.js'
 import { sectionLogger } from '../utils/logger.js'
 
 type AgentResult = { messages: Array<{ _getType?: () => string; content: unknown }> }
@@ -183,161 +182,89 @@ export class WorkCoordinator {
     sectionLogger(`✅ All jobs complete for ${today}`)
   }
 
-  // ── Daily TypeScript Quiz — generate, verify, email ────────────────────────
+  // ── Daily AI News — search, curate, send via Telegram ──────────────────────
 
-  static async runQuizAgent(): Promise<void> {
+  static async runNewsAgent(): Promise<void> {
     const today = new Date().toISOString().split('T')[0]
     const now = new Date().toISOString()
-    const difficulties = ['beginner', 'intermediate', 'advanced'] as const
-    const difficulty = difficulties[Math.floor(Math.random() * difficulties.length)]
 
-    sectionLogger(`📘 Oh My Workers — TypeScript Quiz — ${today}`)
+    sectionLogger(`🤖 Oh My Workers — AI News — ${today}`)
 
-    let quiz: { question: string; answer: string; explanation: string; difficulty: string; topic: string } | null = null
-    let approved = false
-    let feedback = ''
-    let sent = false
+    // ── Step 1: Search for AI news ──────────────────────────────────────────
+    console.log('⚡️ Searching for latest AI news...\n')
 
-    // ── Step 1: Generate ────────────────────────────────────────────────────
-    console.log(`⚡️ Generating ${difficulty} TypeScript quiz...\n`)
-
+    let rawArticles: string
     try {
-      const genResult = await quizGeneratorAgent.invoke({
-        messages: [{ role: 'user', content: `Generate a ${difficulty} TypeScript quiz question now.` }],
+      const searchResult = await newsSearchAgent.invoke({
+        messages: [{ role: 'user', content: 'Search for the latest AI and machine learning news from today.' }],
       })
-      quiz = JSON.parse(WorkCoordinator.toolOutput(genResult, 'generate_typescript_quiz'))
+      rawArticles = WorkCoordinator.toolOutput(searchResult, 'search_ai_news')
     } catch (err) {
-      console.error('❌ Quiz generator failed:', err instanceof Error ? err.message : err)
-      await WorkCoordinator.notifyError('Quiz generator agent', err)
-      return // can't verify or send without a quiz
+      console.error('❌ News search failed:', err instanceof Error ? err.message : err)
+      await WorkCoordinator.notifyError('News search agent', err)
+      return
     }
 
-    // ── Step 2: Verify (up to 3 attempts) ──────────────────────────────────
-    console.log('⚡️ Verifying quiz accuracy...\n')
+    // ── Step 2: Curate and summarize ────────────────────────────────────────
+    console.log('⚡️ Curating top stories...\n')
 
-    let parseErrorCount = 0
-    const MAX_PARSE_ERRORS = 3
-
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      let verifyResult: AgentResult
-
-      try {
-        verifyResult = await quizVerifierAgent.invoke({
-          messages: [
-            {
-              role: 'user',
-              content: `Review this TypeScript quiz for accuracy:\n\nQuestion: ${quiz?.question ?? ''}\n\nAnswer: ${quiz?.answer ?? ''}\n\nExplanation: ${quiz?.explanation ?? ''}`,
-            },
-          ],
-        })
-      } catch (err) {
-        console.error(`❌ Verifier agent threw on attempt ${attempt}:`, err instanceof Error ? err.message : err)
-        await WorkCoordinator.notifyError(`Quiz verifier agent (attempt ${attempt})`, err)
-        break // verifier is unavailable — stop trying
-      }
-
-      let verdict: { approved: boolean; feedback: string; confidence_score: number } | null = null
-
-      try {
-        const raw = WorkCoordinator.toolOutput(verifyResult, 'verify_typescript_quiz')
-        verdict = JSON.parse(raw)
-      } catch (err) {
-        parseErrorCount++
-        console.error(`❌ Failed to parse verifier result on attempt ${attempt} (parse error ${parseErrorCount}/${MAX_PARSE_ERRORS}):`, err instanceof Error ? err.message : err)
-
-        if (parseErrorCount >= MAX_PARSE_ERRORS) {
-          console.error('❌ Too many parse errors — aborting verification.')
-          break
-        }
-
-        attempt-- // retry without consuming an attempt
-        continue
-      }
-
-      feedback = verdict?.feedback ?? ''
-      approved = verdict?.approved ?? false
-
-      if (approved) break
-
-      console.log(`⚠️ Attempt ${attempt} rejected — regenerating...\n`)
-
-      if (attempt < 3) {
-        try {
-          const regenResult = await quizGeneratorAgent.invoke({
-            messages: [
-              {
-                role: 'user',
-                content: `Generate a new ${difficulty} TypeScript quiz. Previous attempt was rejected with feedback: ${verdict?.feedback ?? ''}`,
-              },
-            ],
-          })
-          quiz = JSON.parse(WorkCoordinator.toolOutput(regenResult, 'generate_typescript_quiz'))
-        } catch (err) {
-          console.error(`❌ Quiz regeneration failed on attempt ${attempt}:`, err instanceof Error ? err.message : err)
-          // continue with existing quiz for next verify attempt
-        }
-      }
+    let curated: { articles: Array<{ title: string; url: string; summary: string }>; created_at: string }
+    try {
+      const curateResult = await newsCuratorAgent.invoke({
+        messages: [{ role: 'user', content: `Curate the top AI news from these search results:\n\n${rawArticles}` }],
+      })
+      curated = JSON.parse(WorkCoordinator.toolOutput(curateResult, 'curate_ai_news'))
+    } catch (err) {
+      console.error('❌ News curation failed:', err instanceof Error ? err.message : err)
+      await WorkCoordinator.notifyError('News curator agent', err)
+      return
     }
 
-    // ── Step 3: Send via email + Telegram in parallel if approved ──────────
-    if (approved && quiz) {
-      console.log('\n⚡️ Sending quiz via email and Telegram...\n')
+    if (!curated.articles.length) {
+      console.log('⏭️ No articles curated — skipping send and save.\n')
+      return
+    }
 
-      const quizContent = `Question: ${quiz.question}\n\nAnswer: ${quiz.answer}\n\nExplanation: ${quiz.explanation}\n\nDifficulty: ${quiz.difficulty}\n\nTopic: ${quiz.topic}\n\nVerifier feedback: ${feedback}`
+    // ── Step 3: Send via Telegram ───────────────────────────────────────────
+    console.log('⚡️ Sending news digest via Telegram...\n')
 
-      // Use allSettled so email failure doesn't cancel Telegram and vice versa
-      const [emailSettled, telegramSettled] = await Promise.allSettled([
-        quizEmailAgent.invoke({
-          messages: [{ role: 'user', content: `Send this TypeScript quiz via email now.\n\n${quizContent}` }],
-        }),
-        quizTelegramAgent.invoke({
-          messages: [{ role: 'user', content: `Send this TypeScript quiz via Telegram now.\n\n${quizContent}` }],
-        }),
-      ])
-
-      if (emailSettled.status === 'rejected') {
-        console.error('❌ Email delivery failed:', emailSettled.reason)
-        // notify via Telegram only if Telegram itself succeeded
-        if (telegramSettled.status === 'fulfilled') {
-          await WorkCoordinator.notifyError('Quiz email agent', emailSettled.reason)
-        }
-      }
-
-      if (telegramSettled.status === 'rejected') {
-        console.error('❌ Telegram delivery failed:', telegramSettled.reason)
-        // Telegram is already broken — can't notify there, just log
-      }
-
-      sent = emailSettled.status === 'fulfilled' || telegramSettled.status === 'fulfilled'
-    } else {
-      console.log('\n⏭️ Quiz rejected after 3 attempts — skipping email and Telegram.\n')
-      await WorkCoordinator.notifyError('Quiz pipeline', 'Quiz was rejected after 3 verification attempts — nothing sent today')
+    let sent = false
+    try {
+      await newsTelegramAgent.invoke({
+        messages: [
+          {
+            role: 'user',
+            content: `Send this AI news digest via Telegram now.\n\n${JSON.stringify(curated.articles)}`,
+          },
+        ],
+      })
+      sent = true
+    } catch (err) {
+      console.error('❌ Telegram delivery failed:', err instanceof Error ? err.message : err)
+      await WorkCoordinator.notifyError('News Telegram agent', err)
     }
 
     // ── Step 4: Save to DB ──────────────────────────────────────────────────
-    if (quiz) {
-      try {
-        await saveQuizLog({
-          question: quiz.question,
-          answer: quiz.answer,
-          explanation: quiz.explanation,
-          difficulty: quiz.difficulty as 'beginner' | 'intermediate' | 'advanced',
-          topic: quiz.topic,
-          approved,
-          feedback,
+    try {
+      await saveAiNews(
+        curated.articles.map((a) => ({
+          title: a.title,
+          url: a.url,
+          summary: a.summary,
           sent,
           created_at: now,
           updated_at: now,
-        })
-      } catch (err) {
-        console.error('❌ Failed to save quiz log:', err instanceof Error ? err.message : err)
-        await WorkCoordinator.notifyError('saveQuizLog', err)
-      }
+        }))
+      )
+      console.log(`✅ Saved ${curated.articles.length} articles to database.`)
+    } catch (err) {
+      console.error('❌ Failed to save AI news:', err instanceof Error ? err.message : err)
+      await WorkCoordinator.notifyError('saveAiNews', err)
     }
 
-    sectionLogger(`✅ Quiz job complete for ${today}`)
+    sectionLogger(`✅ AI News job complete for ${today}`)
   }
 }
 
 // ── Named exports for backwards compatibility with index.ts and scheduler.ts ───
-export const { runCleanup, runDailyJobs, runQuizAgent } = WorkCoordinator
+export const { runCleanup, runDailyJobs, runNewsAgent } = WorkCoordinator

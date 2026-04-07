@@ -1,14 +1,14 @@
 import { createAgent, toolCallLimitMiddleware } from 'langchain'
 import { ChatAnthropic } from '@langchain/anthropic'
-import { quizEmailTool } from '../tools/quiz-email.tool.js'
-import { QUIZ_EMAIL_PROMPT } from './prompt.js'
+import { newsSearchTool } from '../tools/news-search.tool.js'
+import { NEWS_SEARCH_PROMPT } from './prompt.js'
 import { DEFAULT_LLM } from '../constants/index.js'
 
 const llm = new ChatAnthropic({ model: DEFAULT_LLM, temperature: 0 })
 
-export const quizEmailAgent = createAgent({
+export const newsSearchAgent = createAgent({
   model: llm,
-  tools: [quizEmailTool],
-  systemPrompt: QUIZ_EMAIL_PROMPT,
+  tools: [newsSearchTool],
+  systemPrompt: NEWS_SEARCH_PROMPT,
   middleware: [toolCallLimitMiddleware({ runLimit: 1, exitBehavior: 'end' })],
 })

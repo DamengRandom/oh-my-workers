@@ -10,7 +10,7 @@
     "start": "pnpm run dev --run",
     "cleanup": "pnpm run dev --cleanup",
     "tsc": "pnpm exec tsc --noEmit 2>&1",
-    "quiz": "pnpm run dev --quiz",
+    "news": "pnpm run dev --news",
     "seed-mock": "node --loader ts-node/esm src/scripts/seed-mock-users.ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\""
@@ -19,6 +19,9 @@
     "oh-my-workers",
     "kpi",
     "daily work diary",
+    "workplace automation",
+    "AI assistant",
+    "daily kpi reporting",
     "cronjobs",
     "automation",
     "AI agent",
@@ -26,7 +29,8 @@
     "typescript",
     "neon",
     "postgresql",
-    "personal assistant"
+    "personal assistant",
+    "news search"
   ],
   "author": "damengrandom",
   "license": "ISC",
@@ -36,6 +40,7 @@
     "@langchain/core": "^1.1.36",
     "@langchain/langgraph": "^1.2.6",
     "@octokit/rest": "^22.0.1",
+    "@tavily/core": "^0.7.2",
     "dotenv": "^17.3.1",
     "langchain": "^1.2.37",
     "node-cron": "^4.2.1",
