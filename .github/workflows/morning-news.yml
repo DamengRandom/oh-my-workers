@@ -1,4 +1,4 @@
-name: Daily AI News
+name: Daily GitHub Trending
 
 on:
   schedule:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   news:
-    name: Search and send AI news digest
+    name: Scrape and send GitHub trending digest
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule' || github.actor == 'DamengRandom'
 
@@ -32,7 +32,6 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           DATABASE_URL: ${{ secrets.NEON_WORK_COORDINATOR_DB_URL }}
-          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: pnpm news

@@ -2,10 +2,10 @@ import { cleanupAgent } from './cleanup.agent.js'
 import { githubAgent } from './github.agent.js'
 import { manualKpiAgent } from './manual-kpi.agent.js'
 import { diaryAgent } from './diary.agent.js'
-import { newsSearchAgent } from './news-search.agent.js'
-import { newsCuratorAgent } from './news-curator.agent.js'
-import { newsTelegramAgent } from './news-telegram.agent.js'
-import { saveKpiRecord, saveAiNews } from '../storage/own-db.js'
+import { trendingCuratorAgent } from './news-curator.agent.js'
+import { trendingTelegramAgent } from './news-telegram.agent.js'
+import { trendingScrapeTool, type TrendingRepo } from '../tools/trending-scrape.tool.js'
+import { saveKpiRecord, saveTrendingRepos, getRecentRepoNames } from '../storage/own-db.js'
 import { sectionLogger } from '../utils/logger.js'
 
 type AgentResult = { messages: Array<{ _getType?: () => string; content: unknown }> }
@@ -127,9 +127,11 @@ export class WorkCoordinator {
     }
 
     let activities: string[] = []
+
     if (manualResult) {
       try {
         const parsed = JSON.parse(WorkCoordinator.toolOutput(manualResult, 'collect_manual_kpi_input'))
+        
         activities = parsed.activities ?? []
       } catch {
         activities = []
@@ -141,6 +143,7 @@ export class WorkCoordinator {
       console.log('\n⏭️ No manual activities provided — skipping diary, saving GitHub KPI only.\n')
 
       let githubData: { summary?: string; commits?: unknown[]; pullRequests?: unknown[] } = {}
+      
       try {
         githubData = JSON.parse(WorkCoordinator.toolOutput(githubResult, 'fetch_github_activity'))
       } catch {
@@ -159,6 +162,7 @@ export class WorkCoordinator {
         console.log('✅ GitHub KPI record saved.')
       } catch (err) {
         console.error('❌ Failed to save KPI record:', err instanceof Error ? err.message : err)
+        
         await WorkCoordinator.notifyError('saveKpiRecord', err)
       }
     } else {
@@ -175,6 +179,7 @@ export class WorkCoordinator {
         })
       } catch (err) {
         console.error('❌ Diary agent failed:', err instanceof Error ? err.message : err)
+        
         await WorkCoordinator.notifyError('Diary agent', err)
       }
     }
@@ -182,87 +187,126 @@ export class WorkCoordinator {
     sectionLogger(`✅ All jobs complete for ${today}`)
   }
 
-  // ── Daily AI News — search, curate, send via Telegram ──────────────────────
+  // ── Daily GitHub Trending — scrape, dedup, curate, send via Telegram ─────
 
   static async runNewsAgent(): Promise<void> {
     const today = new Date().toISOString().split('T')[0]
     const now = new Date().toISOString()
 
-    sectionLogger(`🤖 Oh My Workers — AI News — ${today}`)
+    sectionLogger(`🤖 Oh My Workers — GitHub Trending — ${today}`)
 
-    // ── Step 1: Search for AI news ──────────────────────────────────────────
-    console.log('⚡️ Searching for latest AI news...\n')
+    // ── Step 1: Scrape GitHub trending ──────────────────────────────────────
+    console.log('⚡️ Scraping GitHub trending repos...\n')
 
-    let rawArticles: string
+    let allRepos: TrendingRepo[]
     try {
-      const searchResult = await newsSearchAgent.invoke({
-        messages: [{ role: 'user', content: 'Search for the latest AI and machine learning news from today.' }],
-      })
-      rawArticles = WorkCoordinator.toolOutput(searchResult, 'search_ai_news')
+      const raw = await trendingScrapeTool.invoke({ languages: ['typescript', 'javascript'] })
+      
+      allRepos = JSON.parse(raw)
     } catch (err) {
-      console.error('❌ News search failed:', err instanceof Error ? err.message : err)
-      await WorkCoordinator.notifyError('News search agent', err)
+      console.error('❌ Trending scrape failed:', err instanceof Error ? err.message : err)
+      
+      await WorkCoordinator.notifyError('Trending scrape', err)
+      
       return
     }
 
-    // ── Step 2: Curate and summarize ────────────────────────────────────────
-    console.log('⚡️ Curating top stories...\n')
+    if (!allRepos.length) {
+      console.log('⏭️ No trending repos found — skipping.\n')
+      
+      return
+    }
 
-    let curated: { articles: Array<{ title: string; url: string; summary: string }>; created_at: string }
+    // ── Step 2: Dedup against recent DB entries ─────────────────────────────
+    console.log('⚡️ Deduplicating against recent repos...\n')
+
+    let newRepos: TrendingRepo[]
     try {
-      const curateResult = await newsCuratorAgent.invoke({
-        messages: [{ role: 'user', content: `Curate the top AI news from these search results:\n\n${rawArticles}` }],
-      })
-      curated = JSON.parse(WorkCoordinator.toolOutput(curateResult, 'curate_ai_news'))
+      const recentNames = await getRecentRepoNames(7)
+      
+      newRepos = allRepos.filter((r) => !recentNames.has(r.name))
+      
+      console.log(`📊 ${allRepos.length} scraped, ${allRepos.length - newRepos.length} duplicates removed, ${newRepos.length} new`)
     } catch (err) {
-      console.error('❌ News curation failed:', err instanceof Error ? err.message : err)
-      await WorkCoordinator.notifyError('News curator agent', err)
+      console.error('⚠️ Dedup query failed, proceeding with all repos:', err instanceof Error ? err.message : err)
+      
+      newRepos = allRepos
+    }
+
+    if (!newRepos.length) {
+      console.log('⏭️ All repos already sent recently — skipping.\n')
+      
       return
     }
 
-    if (!curated.articles.length) {
-      console.log('⏭️ No articles curated — skipping send and save.\n')
+    // ── Step 3: Curate and summarize via LLM ────────────────────────────────
+    console.log('⚡️ Curating top repos...\n')
+
+    let curated: { repos: Array<{ repo_name: string; url: string; description: string; language: string; stars: number; today_stars: number; summary: string; tags: string[] }> }
+    
+    try {
+      const curateResult = await trendingCuratorAgent.invoke({
+        messages: [{ role: 'user', content: `Curate the top trending GitHub repos from these results. Pick the top 5-8 most interesting ones:\n\n${JSON.stringify(newRepos)}` }],
+      })
+      
+      curated = JSON.parse(WorkCoordinator.toolOutput(curateResult, 'curate_trending_repos'))
+    } catch (err) {
+      console.error('❌ Trending curation failed:', err instanceof Error ? err.message : err)
+      
+      await WorkCoordinator.notifyError('Trending curator agent', err)
+
       return
     }
 
-    // ── Step 3: Send via Telegram ───────────────────────────────────────────
-    console.log('⚡️ Sending news digest via Telegram...\n')
+    if (!curated.repos.length) {
+      console.log('⏭️ No repos curated — skipping send and save.\n')
+      return
+    }
+
+    // ── Step 4: Send via Telegram ───────────────────────────────────────────
+    console.log('⚡️ Sending trending digest via Telegram...\n')
 
     let sent = false
+    
     try {
-      await newsTelegramAgent.invoke({
+      await trendingTelegramAgent.invoke({
         messages: [
           {
             role: 'user',
-            content: `Send this AI news digest via Telegram now.\n\n${JSON.stringify(curated.articles)}`,
+            content: `Send this GitHub trending digest via Telegram now.\n\n${JSON.stringify(curated.repos)}`,
           },
         ],
       })
       sent = true
     } catch (err) {
       console.error('❌ Telegram delivery failed:', err instanceof Error ? err.message : err)
-      await WorkCoordinator.notifyError('News Telegram agent', err)
+      await WorkCoordinator.notifyError('Trending Telegram agent', err)
     }
 
-    // ── Step 4: Save to DB ──────────────────────────────────────────────────
+    // ── Step 5: Save to DB ──────────────────────────────────────────────────
     try {
-      await saveAiNews(
-        curated.articles.map((a) => ({
-          title: a.title,
-          url: a.url,
-          summary: a.summary,
+      await saveTrendingRepos(
+        curated.repos.map((r) => ({
+          repo_name: r.repo_name,
+          url: r.url,
+          description: r.description,
+          language: r.language,
+          stars: r.stars,
+          today_stars: r.today_stars,
+          summary: r.summary,
+          tags: r.tags,
           sent,
           created_at: now,
           updated_at: now,
         }))
       )
-      console.log(`✅ Saved ${curated.articles.length} articles to database.`)
+      console.log(`✅ Saved ${curated.repos.length} trending repos to database.`)
     } catch (err) {
-      console.error('❌ Failed to save AI news:', err instanceof Error ? err.message : err)
-      await WorkCoordinator.notifyError('saveAiNews', err)
+      console.error('❌ Failed to save trending repos:', err instanceof Error ? err.message : err)
+      await WorkCoordinator.notifyError('saveTrendingRepos', err)
     }
 
-    sectionLogger(`✅ AI News job complete for ${today}`)
+    sectionLogger(`✅ GitHub Trending job complete for ${today}`)
   }
 }
 

@@ -5,21 +5,26 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-export const newsTelegramTool = new DynamicStructuredTool({
-  name: 'send_news_telegram',
-  description: 'Sends the curated daily AI news digest via Telegram.',
+export const trendingTelegramTool = new DynamicStructuredTool({
+  name: 'send_trending_telegram',
+  description: 'Sends the curated daily GitHub trending digest via Telegram.',
   schema: z.object({
-    articles: z
+    repos: z
       .array(
         z.object({
-          title: z.string(),
+          repo_name: z.string(),
           url: z.string(),
+          description: z.string(),
+          language: z.string(),
+          stars: z.number(),
+          today_stars: z.number(),
           summary: z.string(),
+          tags: z.array(z.string()),
         })
       )
-      .describe('The curated AI news articles to send'),
+      .describe('The curated trending repos to send'),
   }),
-  func: async ({ articles }) => {
+  func: async ({ repos }) => {
     const botToken = process.env.TELEGRAM_BOT_TOKEN ?? ''
     const chatId = process.env.TELEGRAM_CHAT_ID ?? ''
     const today = new Date().toISOString().split('T')[0]
@@ -29,25 +34,27 @@ export const newsTelegramTool = new DynamicStructuredTool({
 
     const numberEmojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣']
 
-    const articleLines = articles.map((a, i) => {
+    const repoLines = repos.map((r, i) => {
       const num = numberEmojis[i] ?? `${i + 1}.`
       return [
-        `${num} <b>${escapeHtml(a.title)}</b>`,
-        `<i>${escapeHtml(a.summary)}</i>`,
-        `🔗 <a href="${a.url}">Read more</a>`,
+        `${num} <b>${escapeHtml(r.repo_name)}</b>`,
+        `⭐ ${r.stars.toLocaleString()} (+${r.today_stars} today) · ${escapeHtml(r.language)}`,
+        `<i>${escapeHtml(r.summary)}</i>`,
+        `🏷 ${r.tags.map((t) => `#${t}`).join(' ')}`,
+        `🔗 <a href="${r.url}">View on GitHub</a>`,
       ].join('\n')
     })
 
     const message = [
-      `☀️ <b>Good Morning! Daily AI Dev Digest</b>`,
-      `📅 ${escapeHtml(today)}  ·  TS / JS / Node.js`,
+      `🔥 <b>GitHub Trending — Daily Digest</b>`,
+      `📅 ${escapeHtml(today)}  ·  TypeScript / JavaScript`,
       '',
       '━━━━━━━━━━━━━━━━━━━━━━',
       '',
-      articleLines.join('\n\n'),
+      repoLines.join('\n\n'),
       '',
       '━━━━━━━━━━━━━━━━━━━━━━',
-      `📊 ${articles.length} stories  ·  Powered by Tavily`,
+      `📊 ${repos.length} repos  ·  Powered by GitHub Trending`,
     ].join('\n')
 
     const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
@@ -66,7 +73,7 @@ export const newsTelegramTool = new DynamicStructuredTool({
       throw new Error(`Telegram API error ${response.status}: ${body}`)
     }
 
-    console.log(`✅ AI News Telegram message sent to chat ${chatId}`)
+    console.log(`✅ Trending repos Telegram message sent to chat ${chatId}`)
 
     return JSON.stringify({ success: true, chat_id: chatId, date: today })
   },

@@ -60,14 +60,19 @@ export const CleanupResultSchema = z.object({
   updated_at: z.string(),
 })
 
-// --- AI News ---
-export const AiNewsArticleSchema = z.object({
-  title: z.string(),
+// --- GitHub Trending ---
+export const TrendingRepoSchema = z.object({
+  repo_name: z.string(),
   url: z.string(),
+  description: z.string(),
+  language: z.string(),
+  stars: z.number(),
+  today_stars: z.number(),
   summary: z.string(),
+  tags: z.array(z.string()),
 })
 
-export const AiNewsLogSchema = AiNewsArticleSchema.extend({
+export const TrendingRepoLogSchema = TrendingRepoSchema.extend({
   sent: z.boolean(),
   created_at: z.string(),
   updated_at: z.string(),
@@ -80,5 +85,5 @@ export type ManualKpiInput = z.infer<typeof ManualKpiInputSchema>
 export type KpiRecord = z.infer<typeof KpiRecordSchema>
 export type DiaryEntry = z.infer<typeof DiaryEntrySchema>
 export type CleanupResult = z.infer<typeof CleanupResultSchema>
-export type AiNewsArticle = z.infer<typeof AiNewsArticleSchema>
-export type AiNewsLog = z.infer<typeof AiNewsLogSchema>
+export type TrendingRepo = z.infer<typeof TrendingRepoSchema>
+export type TrendingRepoLog = z.infer<typeof TrendingRepoLogSchema>
