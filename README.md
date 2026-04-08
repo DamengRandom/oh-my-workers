@@ -3,7 +3,7 @@
 A personal AI agent suite for software engineers. Runs daily jobs automatically via GitHub Actions:
 
 - **5pm Sydney** — fetches GitHub activity, asks what else you did, generates a KPI diary report
-- **8am Sydney** — generates a TypeScript quiz, verifies it with a second AI reviewer, sends via email + Telegram
+- **8am Sydney** — scrapes GitHub trending repos (TypeScript/JavaScript), deduplicates against recent sends, curates top picks with an LLM, delivers via Telegram
 
 Built with TypeScript, LangChain, and Claude.
 
@@ -20,14 +20,18 @@ Phase 2 (sequential): manualKpiAgent ← waits for your input
 Phase 3 (sequential): diaryAgent ← writes report from Phase 1+2 data
 ```
 
-**Quiz pipeline (8am):**
+**GitHub Trending pipeline (8am):**
 ```
-quizGeneratorAgent → quizVerifierAgent (approve if confidence ≥ 8/10, up to 3 attempts)
-    ↓ approved
-quizEmailAgent + quizTelegramAgent (parallel) → saved to quiz_log
+Scrape GitHub trending (TS + JS)
+    ↓
+Dedup against DB (last 7 days)
+    ↓
+LLM curator → picks top 5-8, writes summaries + tags
+    ↓
+Telegram delivery → saved to github_trending table
 ```
 
-The generator uses `temperature: 1` for variety; the verifier uses `temperature: 0` for strict accuracy. Two separate Claude calls, two different prompts — catches hallucinations before delivery.
+The curator generates 3-5 tags per repo (e.g. `#ai`, `#framework`, `#bundler`) for future vector search classification.
 
 ---
 
@@ -50,12 +54,7 @@ TARGET_GITHUB_USERNAME=
 DATABASE_URL=postgresql://postgres:password@localhost:5432/work_coordinator
 COMPANY_DB_URL=postgresql://user:password@company-host:5432/company_db
 
-# Quiz — email
-GMAIL_USER=your@gmail.com
-GMAIL_APP_PASSWORD=            # Google Account → Security → 2FA → App Passwords
-QUIZ_EMAIL_RECIPIENT=your@gmail.com
-
-# Quiz — Telegram
+# Telegram
 TELEGRAM_BOT_TOKEN=            # @BotFather on Telegram → /newbot
 TELEGRAM_CHAT_ID=              # message @userinfobot to get your ID, then start your bot first
 ```
@@ -73,7 +72,7 @@ pnpm run setup
 
 ```bash
 pnpm start   # runs all KPI jobs now
-pnpm quiz    # runs quiz pipeline now
+pnpm news    # runs GitHub trending pipeline now
 ```
 
 ---
@@ -90,9 +89,6 @@ Push to GitHub, then add these secrets under **Settings → Secrets and variable
 | `COMPANY_CLEANUP_TABLE` | table to clean, e.g. `mockTestUsers` |
 | `COMPANY_CLEANUP_THRESHOLD_DAYS` | stale threshold, e.g. `30` |
 | `TARGET_GITHUB_USERNAME` | your GitHub username |
-| `GMAIL_USER` | your Gmail address |
-| `GMAIL_APP_PASSWORD` | 16-char App Password from Google Account |
-| `QUIZ_EMAIL_RECIPIENT` | email to receive the quiz |
 | `TELEGRAM_BOT_TOKEN` | from @BotFather |
 | `TELEGRAM_CHAT_ID` | from @userinfobot |
 
@@ -128,7 +124,7 @@ TZ=Australia/Sydney
 | `pnpm run setup` | One-time DB table creation |
 | `pnpm cleanup` | Stale data deletion only (used by crontab) |
 | `pnpm start` | GitHub fetch + manual KPI input + diary report |
-| `pnpm quiz` | Generate, verify, and send today's TypeScript quiz |
+| `pnpm news` | Scrape GitHub trending, curate, send via Telegram |
 | `pnpm dev` | Long-running daemon (fires at 5pm via node-cron) |
 | `pnpm seed-mock` | Seed expired mock users into company DB |
 | `pnpm format` | Auto-format with Prettier |
@@ -147,11 +143,12 @@ src/
 │   ├── github.agent.ts
 │   ├── manual-kpi.agent.ts
 │   ├── diary.agent.ts
-│   ├── quiz-generator.agent.ts
-│   ├── quiz-verifier.agent.ts
-│   ├── quiz-email.agent.ts
-│   └── quiz-telegram.agent.ts
+│   ├── news-curator.agent.ts   # LLM curator for trending repos
+│   └── news-telegram.agent.ts  # Telegram delivery agent
 ├── tools/                      # DynamicStructuredTool implementations
+│   ├── trending-scrape.tool.ts # GitHub trending HTML scraper
+│   ├── news-curator.tool.ts    # Curate + tag trending repos
+│   └── news-telegram.tool.ts   # Format + send Telegram message
 ├── jobs/scheduler.ts           # node-cron schedules
 ├── storage/                    # PostgreSQL queries (own-db + company-db)
 ├── schemas/index.ts            # Zod schemas
@@ -160,7 +157,7 @@ src/
 ├── cleanup.yml                 # Daily 5pm cleanup
 ├── daily-kpi.yml               # Manual KPI trigger (workflow_dispatch)
 ├── seed-mock-users.yml         # Daily 4:30pm mock data seeding
-└── morning-quiz.yml            # Daily 8am TypeScript quiz
+└── morning-news.yml            # Daily 8am GitHub trending digest
 ```
 
 ---
@@ -172,7 +169,7 @@ src/
 | `kpi` | Daily GitHub activity records (commits, PRs, manual activities) |
 | `diary` | AI-generated daily KPI reports |
 | `cleanup_log` | Company DB cleanup history (deleted count, errors) |
-| `quiz_log` | Quiz history (question, answer, approved, sent flags) |
+| `github_trending` | Trending repos with summaries, tags, and sent status |
 
 ---
 
