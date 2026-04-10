@@ -4,3 +4,4 @@ data/
 .DS_Store
 wiki/
 src/assets/slides_to_video/
+src/scripts/test-registry.ts

@@ -7,10 +7,11 @@
   "scripts": {
     "dev": "node --loader ts-node/esm src/index.ts",
     "setup": "pnpm run dev --setup",
-    "start": "pnpm run dev --run",
-    "cleanup": "pnpm run dev --cleanup",
+    "start": "pnpm run dev --job=daily-kpi",
+    "cleanup": "pnpm run dev --job=cleanup",
     "tsc": "pnpm exec tsc --noEmit 2>&1",
-    "news": "pnpm run dev --news",
+    "news": "pnpm run dev --job=news",
+    "jobs": "pnpm run dev --list-jobs",
     "seed-mock": "node --loader ts-node/esm src/scripts/seed-mock-users.ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\""

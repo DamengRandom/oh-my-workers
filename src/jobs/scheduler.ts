@@ -1,33 +1,35 @@
 import cron from 'node-cron'
-import { runDailyJobs, runNewsAgent } from '../agent/index.js'
-import { DEFAULT_CRONJOB_TIME, DEFAULT_CRONJOB_TIMEZONE, NEWS_CRON_TIME } from '../constants/index.js'
+import { DEFAULT_CRONJOB_TIMEZONE } from '../constants/index.js'
+import { jobs, type Job } from './registry.js'
 
+/**
+ * Register every job in the registry that declares a `schedule` with
+ * node-cron. Jobs without a schedule (e.g. the interactive daily-kpi job)
+ * are skipped here and only run on-demand via the CLI. In production,
+ * GitHub Actions drives the same jobs directly via `pnpm dev --job=<name>`.
+ */
 export function startScheduler(): void {
-  // Runs every day at 5:00pm Sydney time
-  // node-cron uses IANA timezone names
-  cron.schedule(
-    DEFAULT_CRONJOB_TIME,
-    async () => {
-      try {
-        await runDailyJobs()
-      } catch (err) {
-        console.error('❌  Daily jobs failed:', err)
-      }
-    },
-    { timezone: DEFAULT_CRONJOB_TIMEZONE }
-  )
+  const scheduled: Job[] = jobs.filter((j) => !!j.schedule)
 
-  cron.schedule(
-    NEWS_CRON_TIME,
-    async () => {
-      try {
-        await runNewsAgent()
-      } catch (err) {
-        console.error('❌ AI News job failed:', err)
-      }
-    },
-    { timezone: DEFAULT_CRONJOB_TIMEZONE }
-  )
+  for (const job of scheduled) {
+    if (!job.schedule) continue
 
-  console.log(`⏰ Scheduler started — daily jobs at ${DEFAULT_CRONJOB_TIME}, news at ${NEWS_CRON_TIME} (${DEFAULT_CRONJOB_TIMEZONE})`)
+    cron.schedule(
+      job.schedule,
+      async () => {
+        try {
+          await job.run()
+        } catch (err) {
+          console.error(`❌ Job "${job.name}" failed:`, err)
+        }
+      },
+      { timezone: job.timezone ?? DEFAULT_CRONJOB_TIMEZONE }
+    )
+  }
+
+  const summary = scheduled
+    .map((j) => `${j.name}@${j.schedule} (${j.timezone ?? DEFAULT_CRONJOB_TIMEZONE})`)
+    .join(', ')
+
+  console.log(`⏰ Scheduler started — ${summary}`)
 }

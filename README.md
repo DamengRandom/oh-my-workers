@@ -122,10 +122,12 @@ TZ=Australia/Sydney
 | Command | What it does |
 |---|---|
 | `pnpm run setup` | One-time DB table creation |
-| `pnpm cleanup` | Stale data deletion only (used by crontab) |
-| `pnpm start` | GitHub fetch + manual KPI input + diary report |
-| `pnpm news` | Scrape GitHub trending, curate, send via Telegram |
-| `pnpm dev` | Long-running daemon (fires at 5pm via node-cron) |
+| `pnpm cleanup` | Stale data deletion only (used by crontab) — alias for `--job=cleanup` |
+| `pnpm start` | GitHub fetch + manual KPI input + diary report — alias for `--job=daily-kpi` |
+| `pnpm news` | Scrape GitHub trending, curate, send via Telegram — alias for `--job=news` |
+| `pnpm jobs` | List every registered job with its cron schedule |
+| `pnpm run dev --job=<name>` | Run any registered job by name (generic dispatch) |
+| `pnpm dev` | Long-running daemon (fires scheduled jobs via node-cron) |
 | `pnpm seed-mock` | Seed expired mock users into company DB |
 | `pnpm format` | Auto-format with Prettier |
 | `pnpm tsc` | TypeScript type check |
@@ -149,7 +151,9 @@ src/
 │   ├── trending-scrape.tool.ts # GitHub trending HTML scraper
 │   ├── news-curator.tool.ts    # Curate + tag trending repos
 │   └── news-telegram.tool.ts   # Format + send Telegram message
-├── jobs/scheduler.ts           # node-cron schedules
+├── jobs/
+│   ├── registry.ts             # Generic Job registry — add new cron jobs here
+│   └── scheduler.ts            # node-cron loop over registry
 ├── storage/                    # PostgreSQL queries (own-db + company-db)
 ├── schemas/index.ts            # Zod schemas
 └── index.ts                    # Entry point + CLI flags
