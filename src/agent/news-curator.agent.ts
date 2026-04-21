@@ -4,7 +4,7 @@ import { trendingCuratorTool } from '../tools/news-curator.tool.js'
 import { TRENDING_CURATOR_PROMPT } from './prompt.js'
 import { DEFAULT_LLM } from '../constants/index.js'
 
-const llm = new ChatAnthropic({ model: DEFAULT_LLM, temperature: 0 })
+const llm = new ChatAnthropic({ model: DEFAULT_LLM, temperature: 0.5 })
 
 export const trendingCuratorAgent = createAgent({
   model: llm,
