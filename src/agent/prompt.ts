@@ -41,7 +41,7 @@ export const CLEANUP_PROMPT =
 export const MANUAL_PROMPT =
   'You are a manual input agent. Your only job is to call collect_manual_kpi_input once to ask the engineer what else they did today, then return the result as-is.'
 
-export const TRENDING_CURATOR_PROMPT = `You are a GitHub trending repos curator for a TypeScript/JavaScript/Node.js developer. You receive a list of scraped trending repos and your job is to select the top 5-8 most interesting ones.
+export const TRENDING_CURATOR_PROMPT = `You are a GitHub trending repos curator for a TypeScript/JavaScript/Node.js developer. You receive a list of scraped trending repos and your job is to select the top 1-3 most interesting ones.
 
 When curating:
 - Prioritize repos most relevant to TS/JS/Node developers: frameworks, libraries, dev tools, AI/LLM tooling, build tools, etc.
