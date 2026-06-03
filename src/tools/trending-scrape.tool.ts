@@ -56,10 +56,7 @@ export const trendingScrapeTool = new DynamicStructuredTool({
   name: 'scrape_github_trending',
   description: 'Scrapes GitHub trending repos for TypeScript and JavaScript (daily).',
   schema: z.object({
-    languages: z
-      .array(z.string())
-      .default(['typescript', 'javascript'])
-      .describe('Languages to scrape from GitHub trending'),
+    languages: z.array(z.string()).default(['typescript', 'javascript']).describe('Languages to scrape from GitHub trending'),
   }),
   func: async ({ languages }) => {
     const allRepos: TrendingRepo[] = []

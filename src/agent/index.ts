@@ -109,10 +109,7 @@ export class WorkCoordinator {
 
     let activities: string[] = []
     if (manualResult) {
-      const parsed = WorkCoordinator.parseJson<{ activities?: string[] }>(
-        WorkCoordinator.toolOutput(manualResult, 'collect_manual_kpi_input'),
-        {}
-      )
+      const parsed = WorkCoordinator.parseJson<{ activities?: string[] }>(WorkCoordinator.toolOutput(manualResult, 'collect_manual_kpi_input'), {})
       activities = parsed.activities ?? []
     }
 
@@ -145,11 +142,7 @@ export class WorkCoordinator {
   }
 
   // Phase 3b: manual activities present — generate and save the full KPI report.
-  private static async generateDiaryReport(
-    githubResult: AgentResult,
-    manualResult: AgentResult | null,
-    activityCount: number
-  ): Promise<void> {
+  private static async generateDiaryReport(githubResult: AgentResult, manualResult: AgentResult | null, activityCount: number): Promise<void> {
     console.log(`\n⚡️ Phase 3: Generating daily KPI report (${activityCount} manual activities recorded)...\n`)
 
     try {
@@ -260,12 +253,14 @@ export class WorkCoordinator {
 
     try {
       const curateResult = await trendingCuratorAgent.invoke({
-        messages: [{ role: 'user', content: `Curate the top trending GitHub repos from these results. Pick the top 5-8 most interesting ones:\n\n${JSON.stringify(newRepos)}` }],
+        messages: [
+          {
+            role: 'user',
+            content: `Curate the top trending GitHub repos from these results. Pick the top 5-8 most interesting ones:\n\n${JSON.stringify(newRepos)}`,
+          },
+        ],
       })
-      const curated = WorkCoordinator.parseJson<{ repos?: CuratedRepo[] }>(
-        WorkCoordinator.toolOutput(curateResult, 'curate_trending_repos'),
-        {}
-      )
+      const curated = WorkCoordinator.parseJson<{ repos?: CuratedRepo[] }>(WorkCoordinator.toolOutput(curateResult, 'curate_trending_repos'), {})
       return curated.repos ?? []
     } catch (err) {
       console.error('❌ Trending curation failed:', err instanceof Error ? err.message : err)
