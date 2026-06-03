@@ -27,9 +27,7 @@ export function startScheduler(): void {
     )
   }
 
-  const summary = scheduled
-    .map((j) => `${j.name}@${j.schedule} (${j.timezone ?? DEFAULT_CRONJOB_TIMEZONE})`)
-    .join(', ')
+  const summary = scheduled.map((j) => `${j.name}@${j.schedule} (${j.timezone ?? DEFAULT_CRONJOB_TIMEZONE})`).join(', ')
 
   console.log(`⏰ Scheduler started — ${summary}`)
 }

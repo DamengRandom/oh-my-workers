@@ -46,10 +46,15 @@ async function seedMockUsers(): Promise<void> {
     // Random age between 31–90 days so they are always past the 30-day cleanup threshold
     const daysAgo = Math.floor(31 + Math.random() * 60)
     const expiredAt = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString()
-    await pool.query(
-      `INSERT INTO "${table}" (username, email, phone, address, gender, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [user.username, user.email, user.phone, user.address, user.gender, expiredAt, expiredAt],
-    )
+    await pool.query(`INSERT INTO "${table}" (username, email, phone, address, gender, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)`, [
+      user.username,
+      user.email,
+      user.phone,
+      user.address,
+      user.gender,
+      expiredAt,
+      expiredAt,
+    ])
     console.log(`  ✓ Inserted: ${user.username} (${user.email}) — expired ${daysAgo} days ago`)
   }
 

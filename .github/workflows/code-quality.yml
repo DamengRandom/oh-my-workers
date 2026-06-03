@@ -1,0 +1,78 @@
+name: Code Quality
+
+# Codebase-level CI quality gate, modeled on Fallow's recommended pipeline:
+# https://docs.fallow.tools/explanations/fallow-vs-linters#recommended-ci-pipeline
+# Format, type-check, and static analysis run in parallel as complementary tools.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    name: Format check (Prettier)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Check formatting
+        run: pnpm format:check
+
+  typecheck:
+    name: Type check (tsc)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Type-check
+        run: pnpm tsc
+
+  analyze:
+    name: Codebase analysis (Fallow)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # upload SARIF to GitHub Code Scanning for inline PR annotations
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so Fallow's change-hotspot analysis works
+
+      - name: Run Fallow analysis
+        uses: fallow-rs/fallow@v2
+        with:
+          # Advisory mode: still annotate the PR with findings, but don't fail
+          # the check on warnings/issues (default for this input is `true`).
+          fail-on-issues: false

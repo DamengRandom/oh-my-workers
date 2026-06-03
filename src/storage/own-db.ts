@@ -88,7 +88,19 @@ export async function saveTrendingRepos(repos: TrendingRepoLog[]): Promise<void>
     await pool.query(
       `INSERT INTO github_trending (repo_name, url, description, language, stars, today_stars, summary, tags, sent, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-      [repo.repo_name, repo.url, repo.description, repo.language, repo.stars, repo.today_stars, repo.summary, repo.tags, repo.sent, repo.created_at, repo.updated_at]
+      [
+        repo.repo_name,
+        repo.url,
+        repo.description,
+        repo.language,
+        repo.stars,
+        repo.today_stars,
+        repo.summary,
+        repo.tags,
+        repo.sent,
+        repo.created_at,
+        repo.updated_at,
+      ]
     )
   }
 }
