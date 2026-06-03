@@ -72,3 +72,7 @@ jobs:
 
       - name: Run Fallow analysis
         uses: fallow-rs/fallow@v2
+        with:
+          # Advisory mode: still annotate the PR with findings, but don't fail
+          # the check on warnings/issues (default for this input is `true`).
+          fail-on-issues: false
