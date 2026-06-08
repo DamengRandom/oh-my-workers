@@ -78,22 +78,6 @@ export const TrendingRepoLogSchema = TrendingRepoSchema.extend({
   updated_at: z.string(),
 })
 
-// --- PR code review (bugs + security + performance) ---
-export const ReviewFindingSchema = z.object({
-  severity: z.enum(['critical', 'high', 'medium', 'low']),
-  category: z.enum(['bug', 'security', 'performance']),
-  file: z.string().describe('Repo-relative path of the file the issue is in'),
-  line: z.number().describe('Line number in the changed file where the issue occurs'),
-  title: z.string().describe('Short one-line summary of the issue'),
-  explanation: z.string().describe('Why this is a real issue, referencing the surrounding code that was inspected'),
-  suggestion: z.string().describe('Concrete fix or change to resolve the issue'),
-})
-
-export const ReviewResultSchema = z.object({
-  summary: z.string().describe('One-paragraph overall assessment of the PR'),
-  findings: z.array(ReviewFindingSchema),
-})
-
 // TypeScript types inferred from schemas
 export type GitHubDigest = z.infer<typeof GitHubDigestSchema>
 export type GithubKpiInput = z.infer<typeof GithubKpiInputSchema>
@@ -103,5 +87,3 @@ export type DiaryEntry = z.infer<typeof DiaryEntrySchema>
 export type CleanupResult = z.infer<typeof CleanupResultSchema>
 export type TrendingRepo = z.infer<typeof TrendingRepoSchema>
 export type TrendingRepoLog = z.infer<typeof TrendingRepoLogSchema>
-export type ReviewFinding = z.infer<typeof ReviewFindingSchema>
-export type ReviewResult = z.infer<typeof ReviewResultSchema>
