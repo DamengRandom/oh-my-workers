@@ -1,6 +1,6 @@
 {
   "name": "@damengrandom/pr-review",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "AI code-review CLI: reviews a GitHub pull request for bugs, security and performance, using a local clone for surrounding-code context.",
   "type": "module",
   "main": "dist/index.js",
