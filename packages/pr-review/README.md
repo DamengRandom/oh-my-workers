@@ -1,4 +1,4 @@
-# @oh-my-worker/pr-review
+# @damengrandom/pr-review
 
 Reviews a GitHub pull request for **bugs, security, and performance** issues — reading the surrounding code from a local clone, so its judgement is grounded in real context, not just the diff.
 
@@ -16,7 +16,7 @@ omw-review https://github.com/acme/widgets/pull/42
 ## Install
 
 ```bash
-npm install -g @oh-my-worker/pr-review
+npm install -g @damengrandom/pr-review
 ```
 
 You now have the `omw-review` command everywhere.
@@ -62,7 +62,7 @@ You get a ranked list of findings — each with **severity · category · `file:
 ## Programmatic use
 
 ```ts
-import { reviewPullRequest, formatReview } from '@oh-my-worker/pr-review'
+import { reviewPullRequest, formatReview } from '@damengrandom/pr-review'
 
 const result = await reviewPullRequest('https://github.com/acme/widgets/pull/42')
 console.log(formatReview(result))

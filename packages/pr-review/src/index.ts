@@ -1,4 +1,4 @@
-// Public library API — lets other code `import { reviewPullRequest } from '@oh-my-worker/pr-review'`.
+// Public library API — lets other code `import { reviewPullRequest } from '@damengrandom/pr-review'`.
 // The CLI (src/cli.ts) is a separate entry exposed via the package `bin`.
 export { reviewPullRequest, prReviewAgent } from './pr-review.agent.js'
 export { formatReview } from './review-formatter.js'
