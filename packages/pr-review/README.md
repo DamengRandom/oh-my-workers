@@ -68,31 +68,9 @@ const result = await reviewPullRequest('https://github.com/acme/widgets/pull/42'
 console.log(formatReview(result))
 ```
 
-<<<<<<< Updated upstream
-The same environment variables apply.
-
----
-
-## Releasing a new version (for maintainers)
-
-> This section is for whoever **publishes** the package — if you're just using the tool, you can ignore it.
-
-Versions follow [semver](https://semver.org): `MAJOR.MINOR.PATCH` — **patch** = bugfix, **minor** = new backward-compatible feature, **major** = breaking change.
-
-**First time only** — log in to npm and make sure you own the `@oh-my-worker` scope (create a free npm org named `oh-my-worker`, or rename the package to your own `@username` scope):
-
-```bash
-npm whoami        # logged in? if not, run: npm login
-```
-
-**Each release — four commands:**
-=======
-## Releasing (maintainers)
->>>>>>> Stashed changes
-
 ```bash
 cd packages/pr-review
-npm version patch          # bump version + create git tag vX.Y.Z (git tree must be clean)
+npm version patch/minor/major          # bump version + create git tag vX.Y.Z (git tree must be clean)
 git push --follow-tags     # push the commit and the tag
 npm publish                # build + publish to npm (needs npm login / 2FA)
 gh release create vX.Y.Z --title "vX.Y.Z" --notes "..."   # GitHub Release (or use the Releases UI)
