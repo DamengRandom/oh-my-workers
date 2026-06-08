@@ -5,3 +5,4 @@ data/
 wiki/
 src/assets/slides_to_video/
 src/scripts/test-registry.ts
+dist/
