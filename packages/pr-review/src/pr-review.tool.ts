@@ -6,8 +6,18 @@ import { readFile } from 'node:fs/promises'
 import { realpathSync } from 'node:fs'
 import path from 'node:path'
 import { z } from 'zod'
+import { MAX_READ_LINES, MAX_PATCH_LINES, MAX_SEARCH_MATCHES } from './constants.js'
 
 const execFileAsync = promisify(execFile)
+
+// Trim an oversized diff patch. Patches ride along in every subsequent model turn, so a huge
+// generated-file diff would be re-sent dozens of times. The agent can read_file for full context.
+function truncatePatch(patch: string): string {
+  const lines = patch.split('\n')
+  if (lines.length <= MAX_PATCH_LINES) return patch
+  const omitted = lines.length - MAX_PATCH_LINES
+  return `${lines.slice(0, MAX_PATCH_LINES).join('\n')}\n… (patch truncated: ${omitted} more line(s) — read the file directly if you need the rest)`
+}
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN })
 
@@ -62,7 +72,7 @@ export const getPrDiffTool = new DynamicStructuredTool({
         status: f.status,
         additions: f.additions,
         deletions: f.deletions,
-        patch: f.patch ?? '(no textual diff — binary or too large)',
+        patch: f.patch ? truncatePatch(f.patch) : '(no textual diff — binary or too large)',
       })),
     }
 
@@ -76,11 +86,14 @@ export const getPrDiffTool = new DynamicStructuredTool({
 export const readFileTool = new DynamicStructuredTool({
   name: 'read_file',
   description:
-    'Reads a file from the local checkout of the repository so you can inspect the surrounding code (callers, definitions, types) before deciding whether a change is a real issue. Path is relative to the repo root.',
+    'Reads a file from the local checkout so you can inspect surrounding code (callers, definitions, types) before deciding whether a change is a real issue. Path is relative to the repo root. Files are returned at most ' +
+    `${MAX_READ_LINES} lines at a time — for larger files, read a targeted window with offset/limit (the diff already tells you which lines changed) instead of pulling the whole file.`,
   schema: z.object({
     path: z.string().describe('Repo-relative path of the file to read, e.g. "src/utils/parser.ts"'),
+    offset: z.number().int().min(1).optional().describe('1-based line number to start reading from. Use to jump to a specific region.'),
+    limit: z.number().int().min(1).optional().describe(`Max number of lines to return (default and hard cap: ${MAX_READ_LINES}).`),
   }),
-  func: async ({ path: relativePath }) => {
+  func: async ({ path: relativePath, offset, limit }) => {
     const absolutePath = resolveInsideRepo(relativePath)
 
     let contents: string
@@ -91,15 +104,24 @@ export const readFileTool = new DynamicStructuredTool({
       return JSON.stringify({ path: relativePath, error: 'File not found or unreadable in the local clone.' })
     }
 
-    // Prefix line numbers so the agent can cite accurate file:line references.
-    const numbered = contents
-      .split('\n')
-      .map((line, i) => `${i + 1}\t${line}`)
+    const allLines = contents.split('\n')
+    const totalLines = allLines.length
+    const start = offset && offset > 0 ? offset : 1
+    const count = Math.min(limit ?? MAX_READ_LINES, MAX_READ_LINES)
+    const end = Math.min(start - 1 + count, totalLines)
+
+    // Prefix absolute line numbers so the agent can cite accurate file:line references.
+    const numbered = allLines
+      .slice(start - 1, end)
+      .map((line, i) => `${start + i}\t${line}`)
       .join('\n')
 
-    console.log(`✅ read_file: ${relativePath} (${contents.split('\n').length} lines)`)
+    // Tell the agent when there's more to read, so it can request another window if needed.
+    const note = end < totalLines || start > 1 ? `Showing lines ${start}-${end} of ${totalLines}. Use offset/limit to read another range.` : undefined
 
-    return JSON.stringify({ path: relativePath, contents: numbered })
+    console.log(`✅ read_file: ${relativePath} (lines ${start}-${end} of ${totalLines})`)
+
+    return JSON.stringify({ path: relativePath, totalLines, startLine: start, endLine: end, contents: numbered, ...(note ? { note } : {}) })
   },
 })
 
@@ -126,7 +148,7 @@ export const searchCodeTool = new DynamicStructuredTool({
       const matches = stdout
         .split('\n')
         .filter(Boolean)
-        .slice(0, 100)
+        .slice(0, MAX_SEARCH_MATCHES)
         .map((line) => line.replace(`${root}${path.sep}`, ''))
 
       console.log(`✅ search_code: "${query}" → ${matches.length} match(es)`)
