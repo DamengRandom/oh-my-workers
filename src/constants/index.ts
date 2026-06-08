@@ -1,4 +1,6 @@
 export const DEFAULT_LLM = 'claude-haiku-4-5-20251001'
+export const REVIEW_LLM = 'claude-sonnet-4-6' // stronger model for code review reasoning (bugs/security/performance)
+export const MAX_REVIEW_TOOL_CALLS = 50 // cap how many times the review agent can read/search context before deciding
 export const COMPANY_CLEANUP_TABLE = 'mockTestUsers'
 export const COMPANY_CLEANUP_THRESHOLD_DAYS = '30'
 export const DEFAULT_CRONJOB_TIME = '0 17 * * *'

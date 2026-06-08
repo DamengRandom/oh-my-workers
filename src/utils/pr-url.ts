@@ -1,0 +1,22 @@
+// Parses a GitHub pull request URL into its owner / repo / number parts.
+// Basic validation only — full guardrails (size limits, richer input handling) are deferred to a later task.
+
+export type ParsedPr = {
+  owner: string
+  repo: string
+  number: number
+}
+
+const PR_URL_REGEX = /github\.com\/([^/\s]+)\/([^/\s]+)\/pull\/(\d+)/i
+
+export function parsePrUrl(url: string): ParsedPr {
+  const match = url.trim().match(PR_URL_REGEX)
+
+  if (!match) {
+    throw new Error(`Invalid GitHub PR URL: "${url}". Expected a URL like https://github.com/<owner>/<repo>/pull/<number>`)
+  }
+
+  const [, owner, repo, number] = match
+
+  return { owner, repo, number: Number(number) }
+}
