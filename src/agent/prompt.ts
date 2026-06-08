@@ -77,6 +77,6 @@ Rules:
 - Every finding must cite the specific file and line in the changed code.
 - Explain WHY it is a problem, referencing the context you read (e.g. "parseUser() returns null when the row is missing — see src/db/user.ts:42").
 - Give a concrete suggested fix.
-- If you find no genuine issues, return an empty findings list and say so in the summary.
+- If you find no genuine issues, say so clearly.
 
-Return your final answer in the required structured format (a summary plus a list of findings).`
+When done investigating, write your final answer as plain text: a one-paragraph overall summary, then a numbered list of findings. For EACH finding include severity (critical/high/medium/low), category (bug/security/performance), the file path and line number, a short title, an explanation of why it is a real problem, and a concrete suggested fix.`

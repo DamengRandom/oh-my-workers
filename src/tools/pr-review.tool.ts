@@ -3,6 +3,7 @@ import { Octokit } from '@octokit/rest'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { readFile } from 'node:fs/promises'
+import { realpathSync } from 'node:fs'
 import path from 'node:path'
 import { z } from 'zod'
 
@@ -18,10 +19,24 @@ function repoRoot(): string {
 }
 
 // Resolve a repo-relative path and refuse anything that escapes the clone (path-traversal guard).
+// path.resolve() is purely lexical and does NOT follow symlinks, so we resolve the real path
+// (via realpathSync) before checking containment — otherwise a symlink committed inside the repo
+// and pointing outside (e.g. link -> /etc) could be used to read files beyond REPO_PATH.
 function resolveInsideRepo(relativePath: string): string {
-  const root = repoRoot()
+  const root = realpathSync(repoRoot())
   const resolved = path.resolve(root, relativePath)
-  if (resolved !== root && !resolved.startsWith(root + path.sep)) {
+
+  // Follow symlinks for paths that exist. If the path doesn't exist there is nothing to read,
+  // so the lexical check on `resolved` is sufficient (path.resolve already normalises any '..').
+  let real = resolved
+  try {
+    real = realpathSync(resolved)
+  } catch {
+    // non-existent path — fall through to the lexical check below
+    throw new Error(`Refusing to read "${relativePath}" — it does not exist.`)
+  }
+
+  if (real !== root && !real.startsWith(root + path.sep)) {
     throw new Error(`Refusing to read "${relativePath}" — it resolves outside REPO_PATH.`)
   }
   return resolved
@@ -102,7 +117,9 @@ export const searchCodeTool = new DynamicStructuredTool({
   }),
   func: async ({ query, glob }) => {
     const root = repoRoot()
-    const args = ['--line-number', '--no-heading', '--color', 'never', '--max-count', '50', '--fixed-strings']
+    // --no-follow is ripgrep's default; we pin it explicitly so the search can never be made to
+    // traverse a symlink out of the repo (defence-in-depth, matching the read_file guard).
+    const args = ['--line-number', '--no-heading', '--color', 'never', '--max-count', '50', '--fixed-strings', '--no-follow']
     if (glob) args.push('--glob', glob)
     args.push('--', query, root)
 

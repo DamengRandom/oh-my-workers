@@ -4,7 +4,7 @@ import { formatReview } from '../utils/review-formatter.js'
 
 // Task 1: hardcode the PR URL here. CLI arg parsing comes in Task 2.
 // Use a real PR you can access; make sure REPO_PATH points at a local clone with the PR's branch checked out.
-const PR_URL = 'https://github.com/your-company/the-repo/pull/123'
+const PR_URL = 'https://github.com/DamengRandom/oh-my-workers/pull/3/changes'
 
 async function main(): Promise<void> {
   const result = await reviewPullRequest(PR_URL)

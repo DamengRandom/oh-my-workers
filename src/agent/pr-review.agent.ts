@@ -1,22 +1,47 @@
 import { createAgent, toolCallLimitMiddleware } from 'langchain'
 import { ChatAnthropic } from '@langchain/anthropic'
+import { AIMessage } from '@langchain/core/messages'
 import { getPrDiffTool, readFileTool, searchCodeTool } from '../tools/pr-review.tool.js'
 import { PR_REVIEW_PROMPT } from './prompt.js'
-import { REVIEW_LLM, MAX_REVIEW_TOOL_CALLS } from '../constants/index.js'
+// import { REVIEW_LLM, MAX_REVIEW_TOOL_CALLS } from '../constants/index.js'
+import { DEFAULT_LLM, MAX_REVIEW_TOOL_CALLS } from '../constants/index.js'
 import { ReviewResultSchema, type ReviewResult } from '../schemas/index.js'
 import { parsePrUrl } from '../utils/pr-url.js'
 
-const llm = new ChatAnthropic({ model: REVIEW_LLM, temperature: 0 })
+const llm = new ChatAnthropic({ model: DEFAULT_LLM, temperature: 0 })
 
 // Unlike the single-call fetch agents, the reviewer loops: read the diff, pull in
 // context with read_file/search_code, then judge. The tool-call limit caps that loop.
+//
+// NOTE: we deliberately do NOT use createAgent's `responseFormat` here. In this langchain
+// build, combining structured-output machinery with an afterModel middleware produces
+// concurrent writes to the internal `jumpTo` channel (INVALID_CONCURRENT_GRAPH_UPDATE).
+// Instead the agent returns a plain-text review, and we convert it to the typed
+// ReviewResult in a separate withStructuredOutput call below.
 export const prReviewAgent = createAgent({
   model: llm,
   tools: [getPrDiffTool, readFileTool, searchCodeTool],
   systemPrompt: PR_REVIEW_PROMPT,
-  responseFormat: ReviewResultSchema,
   middleware: [toolCallLimitMiddleware({ runLimit: MAX_REVIEW_TOOL_CALLS, exitBehavior: 'end' })],
 })
+
+// A separate, single-shot model call that turns the agent's free-text review into the
+// typed ReviewResult. Runs outside the agent graph, so it avoids the jumpTo conflict.
+const structuredLlm = new ChatAnthropic({ model: DEFAULT_LLM, temperature: 0 }).withStructuredOutput(ReviewResultSchema)
+
+// Extract the text of the agent's final assistant message (content may be a string or
+// an array of content blocks).
+function finalMessageText(messages: Array<{ content: unknown }>): string {
+  const last = [...messages].reverse().find((m) => AIMessage.isInstance(m))
+  const content = last?.content
+
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    return content.map((block) => (typeof block === 'object' && block !== null && 'text' in block ? (block as { text: string }).text : '')).join('')
+  }
+
+  return ''
+}
 
 // Orchestrator shared by the Task 1 dev script and the future Task 2 CLI.
 export async function reviewPullRequest(prUrl: string): Promise<ReviewResult> {
@@ -33,5 +58,11 @@ export async function reviewPullRequest(prUrl: string): Promise<ReviewResult> {
     ],
   })
 
-  return result.structuredResponse
+  const reviewText = finalMessageText(result.messages)
+
+  console.log('\n🧩 Structuring findings...\n')
+
+  return structuredLlm.invoke(
+    `Convert the following code-review notes into the structured schema. Preserve every finding exactly; do not invent new ones.\n\n${reviewText}`
+  )
 }
