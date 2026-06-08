@@ -59,24 +59,14 @@ You get a ranked list of findings — each with **severity · category · `file:
 | `Refusing to read "..." outside REPO_PATH` | Safety guard; the tool only reads inside `REPO_PATH`. Harmless. |
 | `rg: command not found` | `brew install ripgrep`. |
 
-## Programmatic use
-
-```ts
-import { reviewPullRequest, formatReview } from '@damengrandom/pr-review'
-
-const result = await reviewPullRequest('https://github.com/acme/widgets/pull/42')
-console.log(formatReview(result))
-```
-
+<!-- ## How to release
 ```bash
 cd packages/pr-review
-npm version patch/minor/major          # bump version + create git tag vX.Y.Z (git tree must be clean)
-git push --follow-tags     # push the commit and the tag
-npm publish                # build + publish to npm (needs npm login / 2FA)
+npm version patch/minor/major # bump version + create git tag vX.Y.Z (git tree must be clean)
+npm publish # build + publish to npm (needs npm login / 2FA)
 gh release create vX.Y.Z --title "vX.Y.Z" --notes "..."   # GitHub Release (or use the Releases UI)
 ```
-
-The git **tag** is what a GitHub Release attaches to — that's what produces the "Latest" badge on the repo. Bump with `patch` / `minor` / `major` per [semver](https://semver.org). You can automate the last two steps with a tag-triggered GitHub Action.
+-->
 
 ## Notes
 
