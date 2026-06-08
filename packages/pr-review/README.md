@@ -1,4 +1,4 @@
-# @oh-my-worker/pr-review
+# @damengrandom/pr-review
 
 AI code-review CLI. Point it at a GitHub pull request and it reviews the changes for **bugs, security, and performance** issues — reading the surrounding code from a local clone so its judgement is grounded in real context, not just the diff.
 
@@ -21,7 +21,7 @@ omw-review https://github.com/acme/widgets/pull/42
 ## Install
 
 ```bash
-npm install -g @oh-my-worker/pr-review
+npm install -g @damengrandom/pr-review
 ```
 
 This gives you the `omw-review` command everywhere on your machine.
@@ -115,7 +115,7 @@ It reviews for **bugs, security, and performance** only — no style nits.
 You can also call it from your own code instead of the CLI:
 
 ```ts
-import { reviewPullRequest, formatReview } from '@oh-my-worker/pr-review'
+import { reviewPullRequest, formatReview } from '@damengrandom/pr-review'
 
 const result = await reviewPullRequest('https://github.com/acme/widgets/pull/42')
 console.log(formatReview(result))
@@ -131,10 +131,10 @@ The same environment variables apply.
 
 Versions follow [semver](https://semver.org): `MAJOR.MINOR.PATCH` — **patch** = bugfix, **minor** = new backward-compatible feature, **major** = breaking change.
 
-**First time only** — log in to npm and make sure you own the `@oh-my-worker` scope (create a free npm org named `oh-my-worker`, or rename the package to your own `@username` scope):
+**First time only** — log in to npm. The package uses your personal `@damengrandom` scope, which you own automatically, so there's no org/scope setup needed:
 
 ```bash
-npm whoami        # logged in? if not, run: npm login
+npm whoami        # should print your username; if it errors, run: npm login
 ```
 
 **Each release — four commands:**
