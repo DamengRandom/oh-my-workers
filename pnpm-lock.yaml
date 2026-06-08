@@ -52,6 +52,37 @@ importers:
         specifier: ^6.0.2
         version: 6.0.2
 
+  packages/pr-review:
+    dependencies:
+      '@langchain/anthropic':
+        specifier: ^1.3.25
+        version: 1.3.25(@langchain/core@1.1.36)
+      '@langchain/core':
+        specifier: ^1.1.36
+        version: 1.1.36
+      '@octokit/rest':
+        specifier: ^22.0.1
+        version: 22.0.1
+      dotenv:
+        specifier: ^17.3.1
+        version: 17.3.1
+      langchain:
+        specifier: ^1.2.37
+        version: 1.2.37(@langchain/core@1.1.36)
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
+    devDependencies:
+      '@types/node':
+        specifier: ^25.5.0
+        version: 25.5.0
+      ts-node:
+        specifier: ^10.9.2
+        version: 10.9.2(@types/node@25.5.0)(typescript@6.0.2)
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.2
+
 packages:
 
   '@anthropic-ai/sdk@0.74.0':

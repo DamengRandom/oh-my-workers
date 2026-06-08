@@ -26,13 +26,10 @@ function resolveInsideRepo(relativePath: string): string {
   const root = realpathSync(repoRoot())
   const resolved = path.resolve(root, relativePath)
 
-  // Follow symlinks for paths that exist. If the path doesn't exist there is nothing to read,
-  // so the lexical check on `resolved` is sufficient (path.resolve already normalises any '..').
   let real = resolved
   try {
     real = realpathSync(resolved)
   } catch {
-    // non-existent path — fall through to the lexical check below
     throw new Error(`Refusing to read "${relativePath}" — it does not exist.`)
   }
 

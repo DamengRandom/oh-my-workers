@@ -1,4 +1,4 @@
-import type { ReviewResult, ReviewFinding } from '../schemas/index.js'
+import type { ReviewResult, ReviewFinding } from './schemas.js'
 
 // Minimal ANSI colors — no extra dependency.
 const COLORS = {

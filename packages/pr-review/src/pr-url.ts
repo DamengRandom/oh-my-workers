@@ -1,5 +1,4 @@
 // Parses a GitHub pull request URL into its owner / repo / number parts.
-// Basic validation only — full guardrails (size limits, richer input handling) are deferred to a later task.
 
 export type ParsedPr = {
   owner: string
