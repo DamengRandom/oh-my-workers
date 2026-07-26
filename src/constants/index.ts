@@ -1,4 +1,5 @@
-export const DEFAULT_LLM = 'claude-haiku-4-5'
+export const DEFAULT_LLM = 'nvidia/nemotron-3-ultra-550b-a55b:free'
+export const DEFAULT_LLM_BASE_URL = 'https://openrouter.ai/api/v1'
 export const COMPANY_CLEANUP_TABLE = 'mockTestUsers'
 export const COMPANY_CLEANUP_THRESHOLD_DAYS = '30'
 export const DEFAULT_CRONJOB_TIME = '0 17 * * *'

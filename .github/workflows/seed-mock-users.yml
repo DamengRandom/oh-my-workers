@@ -1,11 +1,13 @@
 name: Daily Mock User Seeding
 
 on:
-  schedule:
-    # 6:30 AM UTC = 4:30 PM AEST (UTC+10, Apr–Oct)
-    # Note: during AEDT (Oct–Apr, UTC+11) this fires at 5:30 PM Sydney time
-    - cron: '30 6 * * *'
-  workflow_dispatch: # allows manual trigger from GitHub UI
+  # Disabled — mock user seeding no longer runs on a schedule.
+  # Uncomment to re-enable; the job itself is unchanged.
+  # schedule:
+  #   # 6:30 AM UTC = 4:30 PM AEST (UTC+10, Apr–Oct)
+  #   # Note: during AEDT (Oct–Apr, UTC+11) this fires at 5:30 PM Sydney time
+  #   - cron: '30 6 * * *'
+  workflow_dispatch: # still runnable by hand from the GitHub UI
 
 jobs:
   seed:

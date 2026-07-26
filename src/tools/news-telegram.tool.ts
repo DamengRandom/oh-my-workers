@@ -36,12 +36,15 @@ export const trendingTelegramTool = new DynamicStructuredTool({
 
     const repoLines = repos.map((r, i) => {
       const num = numberEmojis[i] ?? `${i + 1}.`
+      // ponytail: the prompt asks for <140 chars, this is what actually guarantees it.
+      // Telegram hard-fails the whole message past 4096, so the bound lives in code.
+      const summary = r.summary.length > 140 ? `${r.summary.slice(0, 137)}...` : r.summary
       return [
         `${num} <b>${escapeHtml(r.repo_name)}</b>`,
         `⭐ ${r.stars.toLocaleString()} (+${r.today_stars} today) · ${escapeHtml(r.language)}`,
-        `<i>${escapeHtml(r.summary)}</i>`,
-        `🏷 ${r.tags.map((t) => `#${t}`).join(' ')}`,
-        `🔗 <a href="${r.url}">View on GitHub</a>`,
+        `<i>${escapeHtml(summary)}</i>`,
+        `🏷 ${r.tags.map((t) => `#${escapeHtml(t)}`).join(' ')}`,
+        `🔗 <a href="${escapeHtml(r.url)}">View on GitHub</a>`,
       ].join('\n')
     })
 

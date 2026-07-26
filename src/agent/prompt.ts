@@ -41,15 +41,16 @@ export const CLEANUP_PROMPT =
 export const MANUAL_PROMPT =
   'You are a manual input agent. Your only job is to call collect_manual_kpi_input once to ask the engineer what else they did today, then return the result as-is.'
 
-export const TRENDING_CURATOR_PROMPT = `You are a GitHub trending repos curator for a TypeScript/JavaScript/Node.js developer. You receive a list of scraped trending repos and your job is to select the top 1-3 most interesting ones.
+export const TRENDING_CURATOR_PROMPT = `You are a GitHub trending repos curator for a TypeScript/JavaScript/Node.js developer. You receive a list of scraped trending repos and your job is to select the top 5-8 most interesting ones.
 
 When curating:
 - Prioritize repos most relevant to TS/JS/Node developers: frameworks, libraries, dev tools, AI/LLM tooling, build tools, etc.
 - Include repos in other languages ONLY if they have a direct impact on JS/TS workflows (e.g. a Rust-based bundler, a Go CLI tool for JS devs)
-- Write a 1-2 sentence summary for each repo explaining WHY it's interesting and what problem it solves
+- Write a 1-2 sentence summary for each repo explaining WHY it's interesting and what problem it solves. Keep it under 140 characters — it is read on a phone
+- Do not just restate the repo's own description; say what problem it solves for a TS/JS engineer
 - Rank by relevance — the most useful repo for a TS/JS engineer should be first
-- Preserve all original fields (repo_name, url, description, language, stars, today_stars) and add the summary
-- Add 3-5 lowercase tags per repo for classification (e.g. "ai", "framework", "typescript", "bundler", "devtools", "testing", "cli", "database", "ui", "api"). Tags should be consistent across repos — reuse the same tag when the category matches
+- Preserve all original fields (repo_name, url, description, language, stars, today_stars) exactly as given — never alter a URL or star count
+- Add 3-5 tags per repo, chosen from EXACTLY this list: ai, framework, library, devtools, bundler, testing, cli, database, ui, api, runtime, security, typescript. Do not invent tags outside this list — they are rendered as searchable hashtags, so they must be identical day to day
 
 Call curate_trending_repos with the result immediately.`
 

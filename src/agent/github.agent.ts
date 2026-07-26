@@ -1,13 +1,10 @@
 import { createAgent, toolCallLimitMiddleware } from 'langchain'
-import { ChatAnthropic } from '@langchain/anthropic'
+import { createLlm } from './llm.js'
 import { githubTool } from '../tools/github.tool.js'
 import { GITHUB_PROMPT } from './prompt.js'
-import { DEFAULT_LLM } from '../constants/index.js'
-
-const llm = new ChatAnthropic({ model: DEFAULT_LLM, temperature: 0 })
 
 export const githubAgent = createAgent({
-  model: llm,
+  model: createLlm(),
   tools: [githubTool],
   systemPrompt: GITHUB_PROMPT,
   middleware: [toolCallLimitMiddleware({ runLimit: 1, exitBehavior: 'end' })],
