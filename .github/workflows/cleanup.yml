@@ -31,7 +31,7 @@ jobs:
 
       - name: Run cleanup
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           DATABASE_URL: ${{ secrets.NEON_WORK_COORDINATOR_DB_URL }}
           COMPANY_DB_URL: ${{ secrets.NEON_MOCK_COMPANY_DB_URL }}
           COMPANY_CLEANUP_TABLE: ${{ secrets.COMPANY_CLEANUP_TABLE }}

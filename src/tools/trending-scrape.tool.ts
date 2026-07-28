@@ -31,8 +31,9 @@ function parseTrendingHtml(html: string): TrendingRepo[] {
     const langMatch = block.match(/<span itemprop="programmingLanguage">([\s\S]*?)<\/span>/)
     const language = langMatch ? langMatch[1].trim() : ''
 
-    // Total stars — matches the first standalone star count (not the "stars today" one)
-    const starsMatch = block.match(/href="\/[^"]*\/stargazers"[^>]*>\s*([\d,]+)\s*<\/a>/)
+    // Total stars — the count sits after the star <svg> icon inside the stargazers link,
+    // so we have to skip the icon markup rather than read straight after the opening tag.
+    const starsMatch = block.match(/href="\/[^"]*\/stargazers"[\s\S]*?<\/svg>\s*([\d,]+)/)
     const stars = starsMatch ? parseInt(starsMatch[1].replace(/,/g, ''), 10) : 0
 
     // Stars today

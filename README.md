@@ -83,7 +83,7 @@ Push to GitHub, then add these secrets under **Settings → Secrets and variable
 
 | Secret | Value |
 |---|---|
-| `ANTHROPIC_API_KEY` | from console.anthropic.com |
+| `LLM_API_KEY` | from openrouter.ai/keys (free tier works) |
 | `NEON_WORK_COORDINATOR_DB_URL` | Neon connection string (remove `&channel_binding=require`) |
 | `NEON_MOCK_COMPANY_DB_URL` | Neon connection string for company DB |
 | `COMPANY_CLEANUP_TABLE` | table to clean, e.g. `mockTestUsers` |

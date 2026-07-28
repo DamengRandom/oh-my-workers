@@ -14,8 +14,12 @@ export const trendingCuratorTool = new DynamicStructuredTool({
           language: z.string().describe('Primary language'),
           stars: z.number().describe('Total star count'),
           today_stars: z.number().describe('Stars gained today'),
-          summary: z.string().describe('1-2 sentence summary of why this repo is interesting for a TS/JS developer'),
-          tags: z.array(z.string()).describe('3-5 lowercase tags for classification e.g. ["ai", "framework", "typescript", "bundler", "devtools"]'),
+          summary: z.string().describe('1-2 sentence summary, under 140 characters, of why this repo is interesting for a TS/JS developer'),
+          tags: z
+            .array(z.string())
+            .describe(
+              '3-5 tags chosen only from: ai, framework, library, devtools, bundler, testing, cli, database, ui, api, runtime, security, typescript'
+            ),
         })
       )
       .describe('Top 5-8 curated trending repos, ranked by relevance'),
