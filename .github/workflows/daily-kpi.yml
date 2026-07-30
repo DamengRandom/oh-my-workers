@@ -36,4 +36,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TARGET_GITHUB_USERNAME: ${{ secrets.TARGET_GITHUB_USERNAME }}
           MANUAL_ACTIVITIES: ${{ github.event.inputs.activities }}
+          LANGSMITH_TRACING: 'true'
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+          LANGSMITH_PROJECT: oh-my-workers
         run: pnpm start

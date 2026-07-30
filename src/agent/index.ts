@@ -7,72 +7,11 @@ import { trendingTelegramAgent } from './news-telegram.agent.js'
 import { trendingScrapeTool, type TrendingRepo } from '../tools/trending-scrape.tool.js'
 import { saveKpiRecord, saveTrendingRepos, getRecentRepoNames } from '../storage/own-db.js'
 import { sectionLogger } from '../utils/logger.js'
-
-type AgentResult = { messages: Array<{ _getType?: () => string; content: unknown }> }
-
-type CuratedRepo = {
-  repo_name: string
-  url: string
-  description: string
-  language: string
-  stars: number
-  today_stars: number
-  summary: string
-  tags: string[]
-}
+import { notifyError, parseJson, toolOutput } from './utils.ts'
+import { AgentResult, CuratedRepo } from '../schemas/index.ts'
+import { runCuratorGraph } from './curator.graph.ts'
 
 export class WorkCoordinator {
-  // ── Shared helpers ────────────────────────────────────────────────────────
-
-  private static toolOutput(result: AgentResult, toolName: string): string {
-    const msg = result.messages.find((m) => m._getType?.() === 'tool' && (m as { name?: string }).name === toolName)
-    if (!msg) return ''
-
-    const content = msg.content
-
-    // LangChain sometimes returns content as an array of content blocks
-    if (Array.isArray(content)) {
-      const block = content.find((c: unknown) => typeof c === 'object' && c !== null && (c as { type?: string }).type === 'text')
-      return block ? (block as { text: string }).text : JSON.stringify(content)
-    }
-
-    return `${content ?? ''}`
-  }
-
-  // Parse JSON, returning a fallback on any error instead of throwing.
-  private static parseJson<T>(raw: string, fallback: T): T {
-    try {
-      return JSON.parse(raw) as T
-    } catch {
-      return fallback
-    }
-  }
-
-  // Send a Telegram alert when an agent or job fails.
-  // Never throws — error notifications must not cause further errors.
-  private static async notifyError(context: string, error: unknown): Promise<void> {
-    const token = process.env.TELEGRAM_BOT_TOKEN
-    const chatId = process.env.TELEGRAM_CHAT_ID
-    if (!token || !chatId) return
-
-    const message = [
-      `⚠️ <b>Oh My Workers — Job Failed</b>`,
-      ``,
-      `<b>Where:</b> ${context}`,
-      `<b>Error:</b> ${error instanceof Error ? error.message : String(error)}`,
-    ].join('\n')
-
-    try {
-      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'HTML' }),
-      })
-    } catch {
-      // intentionally silent — notifyError must never throw
-    }
-  }
-
   // ── Automated (crontab) — no human input required ─────────────────────────
 
   static async runCleanup(): Promise<void> {
@@ -87,7 +26,7 @@ export class WorkCoordinator {
       sectionLogger(`✅ Cleanup complete for ${today}`)
     } catch (err) {
       console.error('❌ Cleanup agent failed:', err instanceof Error ? err.message : err)
-      await WorkCoordinator.notifyError('Cleanup agent', err)
+      await notifyError('Cleanup agent', err)
     }
   }
 
@@ -97,19 +36,21 @@ export class WorkCoordinator {
   // so this swallows errors and returns an empty activity list.
   private static async collectManualActivities(): Promise<{ manualResult: AgentResult | null; activities: string[] }> {
     let manualResult: AgentResult | null = null
+
     try {
       manualResult = await manualKpiAgent.invoke({
         messages: [{ role: 'user', content: 'Ask the engineer what else they did today.' }],
       })
     } catch (err) {
       console.error('❌ Manual KPI agent failed:', err instanceof Error ? err.message : err)
-      await WorkCoordinator.notifyError('Manual KPI agent', err)
+      await notifyError('Manual KPI agent', err)
       // non-critical — continue with GitHub data only
     }
 
     let activities: string[] = []
+
     if (manualResult) {
-      const parsed = WorkCoordinator.parseJson<{ activities?: string[] }>(WorkCoordinator.toolOutput(manualResult, 'collect_manual_kpi_input'), {})
+      const parsed = parseJson<{ activities?: string[] }>(toolOutput(manualResult, 'collect_manual_kpi_input'), {})
       activities = parsed.activities ?? []
     }
 
@@ -120,8 +61,8 @@ export class WorkCoordinator {
   private static async saveGithubOnlyKpi(githubResult: AgentResult, now: string): Promise<void> {
     console.log('\n⏭️ No manual activities provided — skipping diary, saving GitHub KPI only.\n')
 
-    const githubData = WorkCoordinator.parseJson<{ summary?: string; commits?: unknown[]; pullRequests?: unknown[] }>(
-      WorkCoordinator.toolOutput(githubResult, 'fetch_github_activity'),
+    const githubData = parseJson<{ summary?: string; commits?: unknown[]; pullRequests?: unknown[] }>(
+      toolOutput(githubResult, 'fetch_github_activity'),
       {}
     )
 
@@ -137,7 +78,8 @@ export class WorkCoordinator {
       console.log('✅ GitHub KPI record saved.')
     } catch (err) {
       console.error('❌ Failed to save KPI record:', err instanceof Error ? err.message : err)
-      await WorkCoordinator.notifyError('saveKpiRecord', err)
+
+      await notifyError('saveKpiRecord', err)
     }
   }
 
@@ -150,13 +92,14 @@ export class WorkCoordinator {
         messages: [
           {
             role: 'user',
-            content: `Write and save today's KPI report using the data below.\n\nGitHub activity:\n${WorkCoordinator.toolOutput(githubResult, 'fetch_github_activity')}\n\nManual activities:\n${manualResult ? WorkCoordinator.toolOutput(manualResult, 'collect_manual_kpi_input') : ''}`,
+            content: `Write and save today's KPI report using the data below.\n\nGitHub activity:\n${toolOutput(githubResult, 'fetch_github_activity')}\n\nManual activities:\n${manualResult ? toolOutput(manualResult, 'collect_manual_kpi_input') : ''}`,
           },
         ],
       })
     } catch (err) {
       console.error('❌ Diary agent failed:', err instanceof Error ? err.message : err)
-      await WorkCoordinator.notifyError('Diary agent', err)
+
+      await notifyError('Diary agent', err)
     }
   }
 
@@ -171,7 +114,7 @@ export class WorkCoordinator {
 
     if (!username) {
       console.error('❌ GitHub username not set in environment variables.')
-      await WorkCoordinator.notifyError('Daily jobs startup', 'TARGET_GITHUB_USERNAME is not set')
+      await notifyError('Daily jobs startup', 'TARGET_GITHUB_USERNAME is not set')
       return
     }
 
@@ -189,13 +132,16 @@ export class WorkCoordinator {
 
     if (cleanupSettled.status === 'rejected') {
       console.error('❌ Cleanup agent failed:', cleanupSettled.reason)
-      await WorkCoordinator.notifyError('Cleanup agent (daily jobs)', cleanupSettled.reason)
+
+      await notifyError('Cleanup agent (daily jobs)', cleanupSettled.reason)
       // non-critical — continue with GitHub + diary
     }
 
     if (githubSettled.status === 'rejected') {
       console.error('❌ GitHub agent failed:', githubSettled.reason)
-      await WorkCoordinator.notifyError('GitHub agent', githubSettled.reason)
+
+      await notifyError('GitHub agent', githubSettled.reason)
+
       return // can't generate a meaningful KPI report without GitHub data
     }
 
@@ -224,10 +170,13 @@ export class WorkCoordinator {
 
     try {
       const raw = await trendingScrapeTool.invoke({ languages: ['typescript', 'javascript'] })
+
       return JSON.parse(raw) as TrendingRepo[]
     } catch (err) {
       console.error('❌ Trending scrape failed:', err instanceof Error ? err.message : err)
-      await WorkCoordinator.notifyError('Trending scrape', err)
+
+      await notifyError('Trending scrape', err)
+
       return null
     }
   }
@@ -247,25 +196,25 @@ export class WorkCoordinator {
     }
   }
 
-  // Step 3: curate + summarize via LLM. Returns null on failure (already notified).
-  private static async curateRepos(newRepos: TrendingRepo[]): Promise<CuratedRepo[] | null> {
+  // Step 3: curate + summarize via LLM. One attempt — retries and final
+  // failure notification are handled by runCuratorGraph / runNewsAgent.
+  private static async curateRepos(newRepos: TrendingRepo[], feedback?: string): Promise<string> {
     console.log('⚡️ Curating top repos...\n')
+
+    const content = feedback
+      ? `Curate the top trending GitHub repos from these results. Pick the top 5-8 most interesting ones:\n\n${JSON.stringify(newRepos)}\n\nYour previous response could not be parsed (${feedback}). Return valid JSON only, matching the curate_trending_repos tool schema exactly.`
+      : `Curate the top trending GitHub repos from these results. Pick the top 5-8 most interesting ones:\n\n${JSON.stringify(newRepos)}`
 
     try {
       const curateResult = await trendingCuratorAgent.invoke({
-        messages: [
-          {
-            role: 'user',
-            content: `Curate the top trending GitHub repos from these results. Pick the top 5-8 most interesting ones:\n\n${JSON.stringify(newRepos)}`,
-          },
-        ],
+        messages: [{ role: 'user', content }],
       })
-      const curated = WorkCoordinator.parseJson<{ repos?: CuratedRepo[] }>(WorkCoordinator.toolOutput(curateResult, 'curate_trending_repos'), {})
-      return curated.repos ?? []
+
+      return toolOutput(curateResult, 'curate_trending_repos')
     } catch (err) {
-      console.error('❌ Trending curation failed:', err instanceof Error ? err.message : err)
-      await WorkCoordinator.notifyError('Trending curator agent', err)
-      return null
+      console.error('❌ Trending curation attempt failed:', err instanceof Error ? err.message : err)
+
+      return ''
     }
   }
 
@@ -285,7 +234,7 @@ export class WorkCoordinator {
       return true
     } catch (err) {
       console.error('❌ Telegram delivery failed:', err instanceof Error ? err.message : err)
-      await WorkCoordinator.notifyError('Trending Telegram agent', err)
+      await notifyError('Trending Telegram agent', err)
       return false
     }
   }
@@ -311,7 +260,7 @@ export class WorkCoordinator {
       console.log(`✅ Saved ${repos.length} trending repos to database.`)
     } catch (err) {
       console.error('❌ Failed to save trending repos:', err instanceof Error ? err.message : err)
-      await WorkCoordinator.notifyError('saveTrendingRepos', err)
+      await notifyError('saveTrendingRepos', err)
     }
   }
 
@@ -341,19 +290,26 @@ export class WorkCoordinator {
     }
 
     // ── Step 3: Curate and summarize via LLM ────────────────────────────────
-    const repos = await WorkCoordinator.curateRepos(newRepos)
-    if (!repos) return
+    const { curated, error } = await runCuratorGraph(newRepos, WorkCoordinator.curateRepos)
 
-    if (!repos.length) {
+    if (!curated) {
+      console.error('❌ Trending curation failed after retries:', error)
+
+      await notifyError('Trending curator agent', error ?? 'curation failed after retries')
+
+      return
+    }
+
+    if (!curated.length) {
       console.log('⏭️ No repos curated — skipping send and save.\n')
       return
     }
 
     // ── Step 4: Send via Telegram ───────────────────────────────────────────
-    const sent = await WorkCoordinator.sendTelegram(repos)
+    const sent = await WorkCoordinator.sendTelegram(curated)
 
     // ── Step 5: Save to DB ──────────────────────────────────────────────────
-    await WorkCoordinator.saveTrending(repos, sent, now)
+    await WorkCoordinator.saveTrending(curated, sent, now)
 
     sectionLogger(`✅ GitHub Trending job complete for ${today}`)
   }

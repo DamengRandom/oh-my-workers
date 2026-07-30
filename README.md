@@ -3,100 +3,79 @@
 A personal AI agent suite for software engineers. Runs daily jobs automatically via GitHub Actions:
 
 - **5pm Sydney** — fetches GitHub activity, asks what else you did, generates a KPI diary report
-- **8am Sydney** — scrapes GitHub trending repos (TypeScript/JavaScript), deduplicates against recent sends, curates top picks with an LLM, delivers via Telegram
+- **8am Sydney** — scrapes GitHub trending repos (TypeScript/JavaScript), deduplicates, curates top picks with an LLM, delivers via Telegram
 
-Built with TypeScript, LangChain, and Claude.
-
-<video src="https://github.com/user-attachments/assets/1c37e4f1-4a8a-4100-8a07-9cedfa7e745f" width="600" height="360" controls></video>
+Built with TypeScript, LangChain/LangGraph, and any OpenAI-compatible LLM (defaults to OpenRouter, free tier). More detail in the [wiki](https://github.com/DamengRandom/oh-my-workers/wiki).
 
 ---
 
 ## How it works
 
-**KPI pipeline (5pm):**
-```
-Phase 1 (parallel):  cleanupAgent + githubAgent
-Phase 2 (sequential): manualKpiAgent ← waits for your input
-Phase 3 (sequential): diaryAgent ← writes report from Phase 1+2 data
-```
+**KPI pipeline (5pm):** `cleanupAgent + githubAgent` (parallel) → `manualKpiAgent` (waits for your input) → `diaryAgent` (writes report)
 
 **GitHub Trending pipeline (8am):**
 ```
-Scrape GitHub trending (TS + JS)
-    ↓
-Dedup against DB (last 7 days)
-    ↓
-LLM curator → picks top 5-8, writes summaries + tags
-    ↓
-Telegram delivery → saved to github_trending table
+Scrape (TS + JS) → Dedup (last 7 days) → LLM curator → Telegram → saved to DB
 ```
 
-The curator generates 3-5 tags per repo (e.g. `#ai`, `#framework`, `#bundler`) for future vector search classification.
+The curator is a small LangGraph retry loop: if the LLM's output doesn't parse, it retries once with the parse error as feedback; if it still fails, the job alerts you via Telegram instead of failing silently. See [Curator Retry Graph](https://github.com/DamengRandom/oh-my-workers/wiki/Curator-Retry-Graph).
 
 ---
 
 ## Setup
 
-### 1. Install
-
 ```bash
 pnpm install
-cp .env.example .env
+cp .env.example .env     # fill in your keys — see below
+pnpm run setup            # create database tables
+pnpm news                 # test the GitHub trending pipeline
+pnpm start                # test the KPI pipeline
+pnpm test                 # run the unit test suite
 ```
 
-### 2. Configure `.env`
+Minimum required in `.env`:
 
 ```env
-ANTHROPIC_API_KEY=
-GITHUB_TOKEN=                  # github.com/settings/tokens (read:user, repo scopes)
+LLM_API_KEY=              # any OpenAI-compatible provider; defaults to OpenRouter
+GITHUB_TOKEN=              # github.com/settings/tokens (read:user, repo scopes)
 TARGET_GITHUB_USERNAME=
-
 DATABASE_URL=postgresql://postgres:password@localhost:5432/work_coordinator
 COMPANY_DB_URL=postgresql://user:password@company-host:5432/company_db
-
-# Telegram
-TELEGRAM_BOT_TOKEN=            # @BotFather on Telegram → /newbot
-TELEGRAM_CHAT_ID=              # message @userinfobot to get your ID, then start your bot first
+TELEGRAM_BOT_TOKEN=        # @BotFather on Telegram → /newbot
+TELEGRAM_CHAT_ID=          # message @userinfobot, then start your bot first
 ```
 
-### 3. Initialize database
+`LANGSMITH_TRACING` / `LANGSMITH_API_KEY` / `LANGSMITH_PROJECT` are optional (see below). Using Neon? Drop `&channel_binding=require` from the connection string — `pg` doesn't support it.
 
-```bash
-pnpm run setup
-```
+---
 
-> Using Neon? Pass the URL inline: `DATABASE_URL="postgresql://...?sslmode=require" pnpm run setup`
-> Remove `&channel_binding=require` from Neon URLs — the `pg` library doesn't support it.
+## Observability (LangSmith)
 
-### 4. Test
+Optional tracing for every LangChain/LangGraph call — free tier (5,000 traces/month) comfortably covers this project. Set the three `LANGSMITH_*` vars in `.env` (get a key at [smith.langchain.com](https://smith.langchain.com)) — no code changes needed.
 
-```bash
-pnpm start   # runs all KPI jobs now
-pnpm news    # runs GitHub trending pipeline now
-```
+![LangSmith trace logs](/src/assets/images/langsmith-logs.png)
 
 ---
 
 ## Automate via GitHub Actions (recommended)
 
-Push to GitHub, then add these secrets under **Settings → Secrets and variables → Actions**:
+Push to GitHub, add these secrets under **Settings → Secrets and variables → Actions**:
 
 | Secret | Value |
 |---|---|
 | `LLM_API_KEY` | from openrouter.ai/keys (free tier works) |
-| `NEON_WORK_COORDINATOR_DB_URL` | Neon connection string (remove `&channel_binding=require`) |
+| `NEON_WORK_COORDINATOR_DB_URL` | Neon connection string (no `&channel_binding=require`) |
 | `NEON_MOCK_COMPANY_DB_URL` | Neon connection string for company DB |
 | `COMPANY_CLEANUP_TABLE` | table to clean, e.g. `mockTestUsers` |
 | `COMPANY_CLEANUP_THRESHOLD_DAYS` | stale threshold, e.g. `30` |
 | `TARGET_GITHUB_USERNAME` | your GitHub username |
 | `TELEGRAM_BOT_TOKEN` | from @BotFather |
 | `TELEGRAM_CHAT_ID` | from @userinfobot |
+| `LANGSMITH_API_KEY` | optional |
 
 ![GitHub Actions secrets](/src/assets/images/github-actions-secrets.png)
 
-Workflows run automatically. Trigger manually: **Actions** tab → select workflow → **Run workflow**.
-
-The **Daily KPI Report** workflow has a form — enter comma-separated activities before clicking Run.
+Trigger manually: **Actions tab → select workflow → Run workflow**. The Daily KPI Report workflow takes comma-separated activities as input.
 
 ---
 
@@ -105,15 +84,12 @@ The **Daily KPI Report** workflow has a form — enter comma-separated activitie
 ```bash
 crontab -e
 ```
-
-Add (replace paths with your own):
 ```
 PATH=/Users/yourname/.nvm/versions/node/v22.14.0/bin:/opt/homebrew/bin:/usr/bin:/bin
 TZ=Australia/Sydney
 0 17 * * * /opt/homebrew/bin/pnpm --prefix /path/to/project cleanup >> /path/to/project/data/cron.log 2>&1
 ```
-
-> Mac must be awake at 5pm. GitHub Actions is more reliable for unattended runs.
+> Mac must be awake at 5pm — GitHub Actions is more reliable for unattended runs.
 
 ---
 
@@ -122,15 +98,16 @@ TZ=Australia/Sydney
 | Command | What it does |
 |---|---|
 | `pnpm run setup` | One-time DB table creation |
-| `pnpm cleanup` | Stale data deletion only (used by crontab) — alias for `--job=cleanup` |
+| `pnpm cleanup` | Stale data deletion only — alias for `--job=cleanup` |
 | `pnpm start` | GitHub fetch + manual KPI input + diary report — alias for `--job=daily-kpi` |
-| `pnpm news` | Scrape GitHub trending, curate, send via Telegram — alias for `--job=news` |
+| `pnpm news` | Scrape, curate, send via Telegram — alias for `--job=news` |
 | `pnpm jobs` | List every registered job with its cron schedule |
-| `pnpm run dev --job=<name>` | Run any registered job by name (generic dispatch) |
-| `pnpm dev` | Long-running daemon (fires scheduled jobs via node-cron) |
+| `pnpm run dev --job=<name>` | Run any registered job by name |
+| `pnpm dev` | Long-running daemon (node-cron) |
 | `pnpm seed-mock` | Seed expired mock users into company DB |
-| `pnpm format` | Auto-format with Prettier |
+| `pnpm test` | Run the unit test suite (`node:test` via `tsx`) |
 | `pnpm tsc` | TypeScript type check |
+| `pnpm format` | Auto-format with Prettier |
 
 ---
 
@@ -140,28 +117,18 @@ TZ=Australia/Sydney
 src/
 ├── agent/
 │   ├── index.ts                # WorkCoordinator — orchestrates all agents
-│   ├── prompt.ts               # System prompts for all agents
-│   ├── cleanup.agent.ts
-│   ├── github.agent.ts
-│   ├── manual-kpi.agent.ts
-│   ├── diary.agent.ts
-│   ├── news-curator.agent.ts   # LLM curator for trending repos
-│   └── news-telegram.agent.ts  # Telegram delivery agent
+│   ├── prompt.ts                # System prompts for all agents
+│   ├── llm.ts                  # Shared model factory (any OpenAI-compatible provider)
+│   ├── utils.ts                 # Shared helpers: toolOutput, parseJson, notifyError
+│   ├── curator.graph.ts        # LangGraph: self-correcting retry loop for curation
+│   ├── curator-graph.test.ts    # Unit tests for the curator retry graph
+│   └── *.agent.ts               # One focused agent per task
 ├── tools/                      # DynamicStructuredTool implementations
-│   ├── trending-scrape.tool.ts # GitHub trending HTML scraper
-│   ├── news-curator.tool.ts    # Curate + tag trending repos
-│   └── news-telegram.tool.ts   # Format + send Telegram message
-├── jobs/
-│   ├── registry.ts             # Generic Job registry — add new cron jobs here
-│   └── scheduler.ts            # node-cron loop over registry
+├── jobs/                       # registry.ts (add jobs here) + scheduler.ts
 ├── storage/                    # PostgreSQL queries (own-db + company-db)
-├── schemas/index.ts            # Zod schemas
-└── index.ts                    # Entry point + CLI flags
-.github/workflows/
-├── cleanup.yml                 # Daily 5pm cleanup
-├── daily-kpi.yml               # Manual KPI trigger (workflow_dispatch)
-├── seed-mock-users.yml         # Daily 4:30pm mock data seeding
-└── morning-news.yml            # Daily 8am GitHub trending digest
+├── schemas/index.ts            # Zod schemas + shared types (TrendingRepo, CuratedRepo, ...)
+└── index.ts                     # Entry point + CLI flags
+.github/workflows/               # cleanup, daily-kpi, seed-mock-users, morning-news
 ```
 
 ---
@@ -170,10 +137,10 @@ src/
 
 | Table | Description |
 |---|---|
-| `kpi` | Daily GitHub activity records (commits, PRs, manual activities) |
+| `kpi` | Daily GitHub activity records |
 | `diary` | AI-generated daily KPI reports |
-| `cleanup_log` | Company DB cleanup history (deleted count, errors) |
-| `github_trending` | Trending repos with summaries, tags, and sent status |
+| `cleanup_log` | Company DB cleanup history |
+| `github_trending` | Trending repos with summaries, tags, sent status |
 
 ---
 
