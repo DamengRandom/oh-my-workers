@@ -1,11 +1,11 @@
 import { StateGraph, StateSchema, START, END } from '@langchain/langgraph'
 import { z } from 'zod'
-import { TrendingRepoSchema, type CuratedRepo } from '../schemas/index.js'
+import { TrendingRepoOutputSchema, type CuratedRepo } from '../schemas/index.js'
 
 import { parseJson } from './utils.ts'
-import { TrendingRepo } from '../tools/trending-scrape.tool.ts'
+import { TrendingRepo } from '../schemas/index.ts'
 
-const CuratedRepoOutputSchema = z.object({ repos: z.array(TrendingRepoSchema) })
+const CuratedRepoOutputSchema = z.object({ repos: z.array(TrendingRepoOutputSchema) })
 
 export type CurateFn = (repos: TrendingRepo[], feedback?: string) => Promise<string>
 export type CuratorResult = { curated: CuratedRepo[] | null; error: string | null }

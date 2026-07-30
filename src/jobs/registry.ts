@@ -6,8 +6,9 @@ import { DEFAULT_CRONJOB_TIME, DEFAULT_CRONJOB_TIMEZONE, NEWS_CRON_TIME } from '
  *
  * - `name`        stable identifier — used by CLI (`--job=<name>`) and logs
  * - `description` one-line human-readable summary shown by `--list-jobs`
- * - `schedule`    cron expression for the in-process scheduler. Omit for
- *                 interactive/manual-only jobs that are never auto-scheduled
+ * - `schedule`    cron expression, shown by `--list-jobs` — informational only;
+ *                 the actual schedule lives in .github/workflows/*.yml. Omit
+ *                 for interactive/manual-only jobs that are never scheduled
  * - `timezone`    IANA timezone name (defaults to DEFAULT_CRONJOB_TIMEZONE)
  * - `run`         the actual pipeline — hand-written, not generalized
  */

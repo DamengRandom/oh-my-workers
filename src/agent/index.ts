@@ -4,11 +4,11 @@ import { manualKpiAgent } from './manual-kpi.agent.js'
 import { diaryAgent } from './diary.agent.js'
 import { trendingCuratorAgent } from './news-curator.agent.js'
 import { trendingTelegramAgent } from './news-telegram.agent.js'
-import { trendingScrapeTool, type TrendingRepo } from '../tools/trending-scrape.tool.js'
+import { trendingScrapeTool } from '../tools/trending-scrape.tool.js'
 import { saveKpiRecord, saveTrendingRepos, getRecentRepoNames } from '../storage/own-db.js'
 import { sectionLogger } from '../utils/logger.js'
 import { notifyError, parseJson, toolOutput } from './utils.ts'
-import { AgentResult, CuratedRepo } from '../schemas/index.ts'
+import { AgentResult, CuratedRepo, TrendingRepo } from '../schemas/index.ts'
 import { runCuratorGraph } from './curator.graph.ts'
 
 export class WorkCoordinator {
@@ -315,5 +315,5 @@ export class WorkCoordinator {
   }
 }
 
-// ── Named exports for backwards compatibility with index.ts and scheduler.ts ───
+// ── Named exports for backwards compatibility with index.ts and registry.ts ───
 export const { runCleanup, runDailyJobs, runNewsAgent } = WorkCoordinator

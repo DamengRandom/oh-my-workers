@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { runCuratorGraph } from './curator.graph.ts'
-import { TrendingRepo } from '../tools/trending-scrape.tool.ts'
+import { TrendingRepo } from '../schemas/index.ts'
 
 const sampleRepos: TrendingRepo[] = [
   { name: 'foo/bar', url: 'https://github.com/foo/bar', description: 'test repo', language: 'typescript', stars: 100, todayStars: 5 },

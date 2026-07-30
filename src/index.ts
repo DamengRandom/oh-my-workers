@@ -1,6 +1,5 @@
 import 'dotenv/config'
 import { initDb } from './storage/own-db.js'
-import { startScheduler } from './jobs/scheduler.js'
 import { jobs, findJobByCliArg } from './jobs/registry.js'
 
 function printJobs(): void {
@@ -38,7 +37,11 @@ async function main(): Promise<void> {
     process.exit(0)
   }
 
-  startScheduler()
+  // No recognized args — scheduling is handled by GitHub Actions, not an
+  // in-process daemon. Point the user at the actual options instead.
+  console.log('No job specified. Use --job=<name> to run one, or --list-jobs to see all.\n')
+  printJobs()
+  process.exit(0)
 }
 
 main().catch((err) => {

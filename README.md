@@ -79,20 +79,6 @@ Trigger manually: **Actions tab → select workflow → Run workflow**. The Dail
 
 ---
 
-## Automate locally (macOS crontab)
-
-```bash
-crontab -e
-```
-```
-PATH=/Users/yourname/.nvm/versions/node/v22.14.0/bin:/opt/homebrew/bin:/usr/bin:/bin
-TZ=Australia/Sydney
-0 17 * * * /opt/homebrew/bin/pnpm --prefix /path/to/project cleanup >> /path/to/project/data/cron.log 2>&1
-```
-> Mac must be awake at 5pm — GitHub Actions is more reliable for unattended runs.
-
----
-
 ## Commands
 
 | Command | What it does |
@@ -103,7 +89,6 @@ TZ=Australia/Sydney
 | `pnpm news` | Scrape, curate, send via Telegram — alias for `--job=news` |
 | `pnpm jobs` | List every registered job with its cron schedule |
 | `pnpm run dev --job=<name>` | Run any registered job by name |
-| `pnpm dev` | Long-running daemon (node-cron) |
 | `pnpm seed-mock` | Seed expired mock users into company DB |
 | `pnpm test` | Run the unit test suite (`node:test` via `tsx`) |
 | `pnpm tsc` | TypeScript type check |
@@ -124,7 +109,7 @@ src/
 │   ├── curator-graph.test.ts    # Unit tests for the curator retry graph
 │   └── *.agent.ts               # One focused agent per task
 ├── tools/                      # DynamicStructuredTool implementations
-├── jobs/                       # registry.ts (add jobs here) + scheduler.ts
+├── jobs/registry.ts             # Job definitions + CLI dispatch (add jobs here)
 ├── storage/                    # PostgreSQL queries (own-db + company-db)
 ├── schemas/index.ts            # Zod schemas + shared types (TrendingRepo, CuratedRepo, ...)
 └── index.ts                     # Entry point + CLI flags
@@ -139,7 +124,7 @@ src/
 |---|---|
 | `kpi` | Daily GitHub activity records |
 | `diary` | AI-generated daily KPI reports |
-| `cleanup_log` | Company DB cleanup history |
+| `cleanup_log` | Company DB cleanup history (Functionality no longer supported) |
 | `github_trending` | Trending repos with summaries, tags, sent status |
 
 ---
