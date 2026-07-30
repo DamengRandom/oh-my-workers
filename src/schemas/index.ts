@@ -61,7 +61,7 @@ export const CleanupResultSchema = z.object({
 })
 
 // --- GitHub Trending ---
-export const TrendingRepoSchema = z.object({
+export const TrendingRepoOutputSchema = z.object({
   repo_name: z.string(),
   url: z.string(),
   description: z.string(),
@@ -72,22 +72,30 @@ export const TrendingRepoSchema = z.object({
   tags: z.array(z.string()),
 })
 
-export const TrendingRepoLogSchema = TrendingRepoSchema.extend({
+export const TrendingRepoLogSchema = TrendingRepoOutputSchema.extend({
   sent: z.boolean(),
   created_at: z.string(),
   updated_at: z.string(),
 })
 
 // TypeScript types inferred from schemas
+export interface TrendingRepo {
+  name: string // e.g. "owner/repo"
+  url: string
+  description: string
+  language: string
+  stars: number
+  todayStars: number
+}
+
 export type GitHubDigest = z.infer<typeof GitHubDigestSchema>
 export type GithubKpiInput = z.infer<typeof GithubKpiInputSchema>
 export type ManualKpiInput = z.infer<typeof ManualKpiInputSchema>
 export type KpiRecord = z.infer<typeof KpiRecordSchema>
 export type DiaryEntry = z.infer<typeof DiaryEntrySchema>
 export type CleanupResult = z.infer<typeof CleanupResultSchema>
-export type TrendingRepo = z.infer<typeof TrendingRepoSchema>
 export type TrendingRepoLog = z.infer<typeof TrendingRepoLogSchema>
 
-export type CuratedRepo = z.infer<typeof TrendingRepoSchema>
+export type CuratedRepo = z.infer<typeof TrendingRepoOutputSchema>
 
 export type AgentResult = { messages: Array<{ _getType?: () => string; content: unknown }> }

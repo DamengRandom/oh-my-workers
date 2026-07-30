@@ -1,14 +1,6 @@
 import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
-
-export interface TrendingRepo {
-  name: string // e.g. "owner/repo"
-  url: string
-  description: string
-  language: string
-  stars: number
-  todayStars: number
-}
+import { TrendingRepo } from '../schemas/index.ts'
 
 function parseTrendingHtml(html: string): TrendingRepo[] {
   const repos: TrendingRepo[] = []
