@@ -1,11 +1,11 @@
 import { StateGraph, StateSchema, START, END } from '@langchain/langgraph'
 import { z } from 'zod'
-import { TrendingRepoSchema, type CuratedRepo } from '../schemas/index.js';
+import { TrendingRepoSchema, type CuratedRepo } from '../schemas/index.js'
 
-import { parseJson } from './utils.ts';
-import { TrendingRepo } from '../tools/trending-scrape.tool.ts';
+import { parseJson } from './utils.ts'
+import { TrendingRepo } from '../tools/trending-scrape.tool.ts'
 
-const CuratedRepoOutputSchema = z.object({ repos: z.array(TrendingRepoSchema) });
+const CuratedRepoOutputSchema = z.object({ repos: z.array(TrendingRepoSchema) })
 
 export type CurateFn = (repos: TrendingRepo[], feedback?: string) => Promise<string>
 export type CuratorResult = { curated: CuratedRepo[] | null; error: string | null }
@@ -30,10 +30,10 @@ export async function runCuratorGraph(repos: TrendingRepo[], curate: CurateFn): 
       return { error: parsed.error.message, attempts: state.attempts + 1 }
     })
     .addEdge(START, 'curate')
-    .addConditionalEdges('curate', (state) => state.curated || state.attempts >= MAX_ATTEMPTS ? END : 'curate')
+    .addConditionalEdges('curate', (state) => (state.curated || state.attempts >= MAX_ATTEMPTS ? END : 'curate'))
     .compile()
 
-    const result = await graph.invoke({ repos, curated: null, error: null, attempts: 0 })
+  const result = await graph.invoke({ repos, curated: null, error: null, attempts: 0 })
 
-    return { curated: result.curated, error: result.error }
+  return { curated: result.curated, error: result.error }
 }

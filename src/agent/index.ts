@@ -141,7 +141,7 @@ export class WorkCoordinator {
       console.error('❌ GitHub agent failed:', githubSettled.reason)
 
       await notifyError('GitHub agent', githubSettled.reason)
-      
+
       return // can't generate a meaningful KPI report without GitHub data
     }
 
@@ -296,7 +296,7 @@ export class WorkCoordinator {
       console.error('❌ Trending curation failed after retries:', error)
 
       await notifyError('Trending curator agent', error ?? 'curation failed after retries')
-      
+
       return
     }
 

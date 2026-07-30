@@ -1,4 +1,4 @@
-import { AgentResult } from "../schemas/index.ts"
+import { AgentResult } from '../schemas/index.ts'
 
 export function toolOutput(result: AgentResult, toolName: string): string {
   const msg = result.messages.find((m) => m._getType?.() === 'tool' && (m as { name?: string }).name === toolName)
@@ -42,7 +42,7 @@ export async function notifyError(context: string, error: unknown): Promise<void
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'HTML' }),
     })
-  } catch(error) {
+  } catch (error) {
     console.error('Failed to notify error to Telegram', { message: error instanceof Error ? error.message : String(error) })
   }
 }

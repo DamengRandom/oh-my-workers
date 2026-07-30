@@ -3,10 +3,23 @@ import assert from 'node:assert/strict'
 import { runCuratorGraph } from './curator.graph.ts'
 import { TrendingRepo } from '../tools/trending-scrape.tool.ts'
 
-const sampleRepos: TrendingRepo[] = [{ name: 'foo/bar', url: 'https://github.com/foo/bar', description: 'test repo', language: 'typescript', stars: 100, todayStars: 5 }]
+const sampleRepos: TrendingRepo[] = [
+  { name: 'foo/bar', url: 'https://github.com/foo/bar', description: 'test repo', language: 'typescript', stars: 100, todayStars: 5 },
+]
 
 const validCuratorOutput = JSON.stringify({
-  repos: [{ repo_name: 'foo/bar', url: 'https://github.com/foo/bar', description: 'test repo', language: 'typescript', stars: 100, today_stars: 5, summary: 'a test repo', tags: ['typescript'] }],
+  repos: [
+    {
+      repo_name: 'foo/bar',
+      url: 'https://github.com/foo/bar',
+      description: 'test repo',
+      language: 'typescript',
+      stars: 100,
+      today_stars: 5,
+      summary: 'a test repo',
+      tags: ['typescript'],
+    },
+  ],
 })
 
 test('returns curated repos when the curator succeeds on the first attempt', async () => {
