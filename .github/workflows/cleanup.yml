@@ -36,4 +36,7 @@ jobs:
           COMPANY_DB_URL: ${{ secrets.NEON_MOCK_COMPANY_DB_URL }}
           COMPANY_CLEANUP_TABLE: ${{ secrets.COMPANY_CLEANUP_TABLE }}
           COMPANY_CLEANUP_THRESHOLD_DAYS: ${{ secrets.COMPANY_CLEANUP_THRESHOLD_DAYS }}
+          LANGSMITH_TRACING: 'true'
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+          LANGSMITH_PROJECT: oh-my-workers
         run: pnpm cleanup

@@ -41,7 +41,7 @@ export const jobs: Job[] = [
   },
 ]
 
-export function findJobByName(name: string): Job | undefined {
+function findJobByName(name: string): Job | undefined {
   return jobs.find((j) => j.name === name)
 }
 

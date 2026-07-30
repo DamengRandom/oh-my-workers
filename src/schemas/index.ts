@@ -87,3 +87,7 @@ export type DiaryEntry = z.infer<typeof DiaryEntrySchema>
 export type CleanupResult = z.infer<typeof CleanupResultSchema>
 export type TrendingRepo = z.infer<typeof TrendingRepoSchema>
 export type TrendingRepoLog = z.infer<typeof TrendingRepoLogSchema>
+
+export type CuratedRepo = z.infer<typeof TrendingRepoSchema>
+
+export type AgentResult = { messages: Array<{ _getType?: () => string; content: unknown }> }

@@ -4,7 +4,8 @@ import { startScheduler } from './jobs/scheduler.js'
 import { jobs, findJobByCliArg } from './jobs/registry.js'
 
 function printJobs(): void {
-  console.log('Available jobs:')
+  console.log('Available jobs 📋:')
+
   for (const j of jobs) {
     const scheduledJobs = j.schedule ? ` [${j.schedule}]` : ' [manual]'
 
