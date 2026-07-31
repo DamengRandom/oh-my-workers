@@ -7,8 +7,10 @@ name: Code Quality
 on:
   push:
     branches: [master]
+  # No `branches` filter: quality gates should run on every pull request, not
+  # just those targeting master. Stacked PRs (base = another feature branch)
+  # were silently skipping format, typecheck and Fallow entirely.
   pull_request:
-    branches: [master]
 
 permissions:
   contents: read
