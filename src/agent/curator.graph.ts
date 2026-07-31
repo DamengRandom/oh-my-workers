@@ -20,33 +20,37 @@ const CuratorState = new StateSchema({
   attempts: z.custom<number>(),
 })
 
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
+
+async function curateNode(state: { repos: TrendingRepo[]; error: string | null; attempts: number }, curate: CurateFn) {
+  let raw: string
+  try {
+    raw = await curate(state.repos, state.error || undefined)
+  } catch (err) {
+    return { error: `curate() threw: ${errorMessage(err)}`, attempts: state.attempts + 1 }
+  }
+
+  let json: unknown
+  try {
+    json = JSON.parse(raw)
+  } catch (err) {
+    return {
+      error: `curator output was not valid JSON (${errorMessage(err)}) — ${raw.length} chars: ${truncate(raw, EXCERPT_MAX)}`,
+      attempts: state.attempts + 1,
+    }
+  }
+
+  const parsed = CuratedRepoOutputSchema.safeParse(json)
+  if (parsed.success) return { curated: parsed.data.repos, error: null }
+
+  return { error: `curator output did not match the expected schema: ${parsed.error.message}`, attempts: state.attempts + 1 }
+}
+
 export async function runCuratorGraph(repos: TrendingRepo[], curate: CurateFn): Promise<CuratorResult> {
   const graph = new StateGraph(CuratorState)
-    .addNode('curate', async (state) => {
-      let raw: string
-      try {
-        raw = await curate(state.repos, state.error || undefined)
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err)
-        return { error: `curate() threw: ${message}`, attempts: state.attempts + 1 }
-      }
-
-      let json: unknown
-      try {
-        json = JSON.parse(raw)
-      } catch (err) {
-        const cause = err instanceof Error ? err.message : String(err)
-        return {
-          error: `curator output was not valid JSON (${cause}) — ${raw.length} chars: ${truncate(raw, EXCERPT_MAX)}`,
-          attempts: state.attempts + 1,
-        }
-      }
-
-      const parsed = CuratedRepoOutputSchema.safeParse(json)
-      if (parsed.success) return { curated: parsed.data.repos, error: null }
-
-      return { error: `curator output did not match the expected schema: ${parsed.error.message}`, attempts: state.attempts + 1 }
-    })
+    .addNode('curate', (state) => curateNode(state, curate))
     .addEdge(START, 'curate')
     .addConditionalEdges('curate', (state) => (state.curated || state.attempts >= MAX_ATTEMPTS ? END : 'curate'))
     .compile()

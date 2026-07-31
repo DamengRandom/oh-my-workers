@@ -102,3 +102,15 @@ test('an exception thrown by curate() is caught and recorded instead of crashing
   assert.match(result.error ?? '', /curate\(\) threw/)
   assert.match(result.error ?? '', /rate limited/)
 })
+
+test('a non-Error value thrown by curate() is still stringified into the recorded error', async () => {
+  const fakeCurate = async () => {
+    throw 'connection reset'
+  }
+
+  const result = await runCuratorGraph(sampleRepos, fakeCurate)
+
+  assert.equal(result.curated, null)
+  assert.match(result.error ?? '', /curate\(\) threw/)
+  assert.match(result.error ?? '', /connection reset/)
+})
