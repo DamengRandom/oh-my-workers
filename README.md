@@ -4,7 +4,7 @@ A personal AI agent suite for software engineers. Runs daily jobs automatically 
 
 - **5pm Sydney** — fetches GitHub activity, asks what else you did, generates a KPI diary report
 - **8am Sydney** — scrapes GitHub trending repos (TypeScript/JavaScript), ranks them by stars gained today, has an LLM write the summaries, delivers via Telegram
-- **8:30am Sydney** — searches AI industry news via Tavily, drops stories already sent, delivers the top 4 via Telegram
+- **8:30am Sydney** — searches AI technology news via Tavily (new models, dev tools, releases), drops stories already sent, delivers the top 4 via Telegram
 
 Built with TypeScript, LangChain/LangGraph, and any OpenAI-compatible LLM (defaults to OpenRouter, free tier). More detail in the [wiki](https://github.com/DamengRandom/oh-my-workers/wiki).
 
@@ -27,8 +27,10 @@ The curator is a small LangGraph retry loop: if the LLM's output doesn't parse, 
 
 **AI news pipeline (8:30am):**
 ```
-Tavily search (last 24h, tech/business outlets) → drop urls already sent → top 4 → Telegram → saved to DB
+Tavily search (last 24h, tech press + dev blogs) → drop urls already sent → top 4 → Telegram → saved to DB
 ```
+
+Scope is AI *technology* — new models, developer tools, releases. Finance-led outlets are deliberately absent: their AI coverage is funding rounds and stock moves, not software.
 
 No model in this pipeline — Tavily's own article excerpts are the summaries, so there is nothing to hallucinate and nothing to retry.
 

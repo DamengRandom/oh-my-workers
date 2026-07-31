@@ -18,16 +18,30 @@ export const AI_NEWS_SNIPPET_MAX = 200
 // Tavily's `score` is relevance to this query, not popularity — a vague query
 // like "artificial intelligence" scores wellness blogs above model launches.
 // Digest quality lives here and in AI_NEWS_DOMAINS, not in the ranking.
-export const AI_NEWS_QUERY = 'major AI model releases, funding, and industry announcements'
+//
+// Scope is AI *technology*: new models, developer tools, releases. Wording the
+// query around releases and tools is what keeps funding rounds and stock moves
+// out — asking for "industry announcements" pulled in ETFs and defence news.
+export const AI_NEWS_QUERY = 'new AI model releases, developer tools, and open source AI software'
+// Tech press for launches and product news, developer sources for tooling and
+// releases. Deliberately no reuters/bloomberg — their AI coverage is finance,
+// which is what dragged in stock and ETF stories.
+//
+// ponytail: an allowlist, not a hard filter — Tavily treats include_domains as a
+// strong hint, so the occasional off-list SEO listicle still slips through. Add
+// exclude_domains only if one actually reaches a digest.
 export const AI_NEWS_DOMAINS = [
   'techcrunch.com',
   'theverge.com',
   'arstechnica.com',
   'venturebeat.com',
-  'wired.com',
-  'reuters.com',
-  'bloomberg.com',
-  'theinformation.com',
+  'theregister.com',
+  'infoworld.com',
+  'zdnet.com',
+  'simonwillison.net',
+  'github.blog',
+  'huggingface.co',
+  'marktechpost.com',
 ]
 
 export const DEFAULT_CRONJOB_TIME = '0 17 * * *'
