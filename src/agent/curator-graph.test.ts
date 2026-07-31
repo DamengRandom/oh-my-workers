@@ -59,3 +59,46 @@ test('gives up after exhausting retries — curated is null, not an empty array,
   assert.equal(result.curated, null)
   assert.ok(result.error, 'expected a validation error to be surfaced, not swallowed')
 })
+
+test('non-JSON output names the parse failure and includes the offending text, not a generic Zod null error', async () => {
+  const fakeCurate = async () => 'this is not json at all'
+
+  const result = await runCuratorGraph(sampleRepos, fakeCurate)
+
+  assert.equal(result.curated, null)
+  assert.match(result.error ?? '', /not valid JSON/)
+  assert.match(result.error ?? '', /this is not json at all/)
+})
+
+test('a long non-JSON response is truncated in the recorded error, with the original length reported', async () => {
+  const longRaw = 'x'.repeat(500)
+  const fakeCurate = async () => longRaw
+
+  const result = await runCuratorGraph(sampleRepos, fakeCurate)
+
+  assert.equal(result.curated, null)
+  assert.match(result.error ?? '', /500 chars/)
+  assert.ok((result.error ?? '').length < longRaw.length, 'expected the excerpt to be bounded, not a full raw dump')
+})
+
+test('well-formed JSON that fails the schema produces a distinguishably different error from a parse failure', async () => {
+  const fakeCurate = async () => JSON.stringify({ repos: [{ nope: true }] })
+
+  const result = await runCuratorGraph(sampleRepos, fakeCurate)
+
+  assert.equal(result.curated, null)
+  assert.match(result.error ?? '', /did not match the expected schema/)
+  assert.doesNotMatch(result.error ?? '', /not valid JSON/)
+})
+
+test('an exception thrown by curate() is caught and recorded instead of crashing the graph', async () => {
+  const fakeCurate = async () => {
+    throw new Error('rate limited')
+  }
+
+  const result = await runCuratorGraph(sampleRepos, fakeCurate)
+
+  assert.equal(result.curated, null)
+  assert.match(result.error ?? '', /curate\(\) threw/)
+  assert.match(result.error ?? '', /rate limited/)
+})
