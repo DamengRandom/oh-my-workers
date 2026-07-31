@@ -3,7 +3,7 @@
 A personal AI agent suite for software engineers. Runs daily jobs automatically via GitHub Actions:
 
 - **5pm Sydney** — fetches GitHub activity, asks what else you did, generates a KPI diary report
-- **8am Sydney** — scrapes GitHub trending repos (TypeScript/JavaScript), deduplicates, curates top picks with an LLM, delivers via Telegram
+- **8am Sydney** — scrapes GitHub trending repos (TypeScript/JavaScript), ranks them by stars gained today, has an LLM write the summaries, delivers via Telegram
 
 Built with TypeScript, LangChain/LangGraph, and any OpenAI-compatible LLM (defaults to OpenRouter, free tier). More detail in the [wiki](https://github.com/DamengRandom/oh-my-workers/wiki).
 
@@ -11,12 +11,16 @@ Built with TypeScript, LangChain/LangGraph, and any OpenAI-compatible LLM (defau
 
 ## How it works
 
-**KPI pipeline (5pm):** `cleanupAgent + githubAgent` (parallel) → `manualKpiAgent` (waits for your input) → `diaryAgent` (writes report)
+**KPI pipeline (5pm):** `cleanupTool + githubAgent` (parallel) → `manualKpiTool` (waits for your input) → `diaryAgent` (writes report)
+
+Cleanup and manual input are plain tool calls — there is no decision for a model to make, so they skip the agent loop entirely.
 
 **GitHub Trending pipeline (8am):**
 ```
-Scrape (TS + JS) → Dedup (last 7 days) → LLM curator → Telegram → saved to DB
+Scrape (TS + JS) → Rank by stars gained today (top 8) → LLM writes summaries → Telegram → upserted to DB
 ```
+
+Selection is a sort, not a judgement call: the model only writes prose, and star counts, URLs and ordering come from the scrape, so it cannot corrupt the numbers on the digest.
 
 The curator is a small LangGraph retry loop: if the LLM's output doesn't parse, it retries once with the parse error as feedback; if it still fails, the job alerts you via Telegram instead of failing silently. See [Curator Retry Graph](https://github.com/DamengRandom/oh-my-workers/wiki/Curator-Retry-Graph).
 

@@ -2,7 +2,8 @@ name: Code Quality
 
 # Codebase-level CI quality gate, modeled on Fallow's recommended pipeline:
 # https://docs.fallow.tools/explanations/fallow-vs-linters#recommended-ci-pipeline
-# Format, type-check, and static analysis run in parallel as complementary tools.
+# Format, type-check, tests and static analysis run in parallel as complementary
+# tools — none of them catches what the others do.
 
 on:
   push:
@@ -59,6 +60,28 @@ jobs:
 
       - name: Type-check
         run: pnpm tsc
+
+  test:
+    name: Unit tests (node:test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run tests
+        run: pnpm test
 
   analyze:
     name: Codebase analysis (Fallow)
