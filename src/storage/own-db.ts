@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js'
 import { Pool } from 'pg'
 import type { KpiRecord, DiaryEntry, CleanupResult, TrendingRepoLog } from '../schemas/index.js'
 
@@ -54,7 +55,7 @@ export async function initDb(): Promise<void> {
     -- duplicate repo_names — run scripts/dedupe-trending.ts first.
     CREATE UNIQUE INDEX IF NOT EXISTS github_trending_repo_name_key ON github_trending (repo_name);
   `)
-  console.log('✅ Own database tables ready')
+  logger.info('✅ Own database tables ready')
 }
 
 // ─── Writes ───────────────────────────────────────────────────────────────────

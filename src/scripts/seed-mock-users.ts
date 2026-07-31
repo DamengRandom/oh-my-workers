@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js'
 import 'dotenv/config'
 import { Pool } from 'pg'
 
@@ -39,7 +40,7 @@ function randomUser(index: number) {
 async function seedMockUsers(): Promise<void> {
   const count = Math.floor(1 + Math.random() * 5) // 1–5 random users
 
-  console.log(`🌱 Seeding ${count} expired mock user(s) into "${table}"...`)
+  logger.info(`🌱 Seeding ${count} expired mock user(s) into "${table}"...`)
 
   for (let i = 0; i < count; i++) {
     const user = randomUser(i)
@@ -55,14 +56,14 @@ async function seedMockUsers(): Promise<void> {
       expiredAt,
       expiredAt,
     ])
-    console.log(`  ✓ Inserted: ${user.username} (${user.email}) — expired ${daysAgo} days ago`)
+    logger.info(`  ✓ Inserted: ${user.username} (${user.email}) — expired ${daysAgo} days ago`)
   }
 
-  console.log(`✅ Seeded ${count} mock user(s) successfully.`)
+  logger.info(`✅ Seeded ${count} mock user(s) successfully.`)
   await pool.end()
 }
 
 seedMockUsers().catch((err) => {
-  console.error('Fatal error during seeding:', err)
+  logger.error({ err: err }, 'Fatal error during seeding')
   process.exit(1)
 })
