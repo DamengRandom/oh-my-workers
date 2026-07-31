@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js'
 import { DynamicStructuredTool } from '@langchain/core/tools'
 import { Octokit } from '@octokit/rest'
 import { z } from 'zod'
@@ -57,7 +58,7 @@ export const githubTool = new DynamicStructuredTool({
       updated_at: now,
     })
 
-    console.log(`✅ GitHub: found ${commits.length} commits and ${pullRequests.length} PRs for ${date}`)
+    logger.info(`✅ GitHub: found ${commits.length} commits and ${pullRequests.length} PRs for ${date}`)
 
     return JSON.stringify(digest)
   },

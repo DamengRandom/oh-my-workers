@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js'
 import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
 
@@ -76,7 +77,7 @@ export const trendingTelegramTool = new DynamicStructuredTool({
       throw new Error(`Telegram API error ${response.status}: ${body}`)
     }
 
-    console.log(`✅ Trending repos Telegram message sent to chat ${chatId}`)
+    logger.info(`✅ Trending repos Telegram message sent to chat ${chatId}`)
 
     return JSON.stringify({ success: true, chat_id: chatId, date: today })
   },

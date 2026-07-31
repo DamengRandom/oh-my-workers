@@ -2,13 +2,16 @@ name: Code Quality
 
 # Codebase-level CI quality gate, modeled on Fallow's recommended pipeline:
 # https://docs.fallow.tools/explanations/fallow-vs-linters#recommended-ci-pipeline
-# Format, type-check, and static analysis run in parallel as complementary tools.
+# Format, type-check, tests and static analysis run in parallel as complementary
+# tools — none of them catches what the others do.
 
 on:
   push:
     branches: [master]
+  # No `branches` filter: quality gates should run on every pull request, not
+  # just those targeting master. Stacked PRs (base = another feature branch)
+  # were silently skipping format, typecheck and Fallow entirely.
   pull_request:
-    branches: [master]
 
 permissions:
   contents: read
@@ -58,6 +61,28 @@ jobs:
       - name: Type-check
         run: pnpm tsc
 
+  test:
+    name: Unit tests (node:test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run tests
+        run: pnpm test
+
   analyze:
     name: Codebase analysis (Fallow)
     runs-on: ubuntu-latest
@@ -70,12 +95,36 @@ jobs:
         with:
           fetch-depth: 0 # full history so Fallow's change-hotspot analysis works
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      # CRAP = complexity² × (1 − coverage)³ + complexity. Without coverage data
+      # Fallow assumes 0%, which collapses CRAP to complexity² + complexity and
+      # flags every function with 5+ branches no matter how well tested it is.
+      - name: Generate coverage for exact CRAP scores
+        run: pnpm test:coverage
+
       - name: Run Fallow analysis
         # v3+: platform packages ship a single multicall `fallow` binary. The v2
         # action still verified `fallow-lsp`/`fallow-mcp`, which no published CLI
         # provides any more, so every run failed at binary verification.
         uses: fallow-rs/fallow@v3
+        env:
+          FALLOW_COVERAGE: coverage/coverage-final.json
         with:
-          # Advisory mode: still annotate the PR with findings, but don't fail
-          # the check on warnings/issues (default for this input is `true`).
-          fail-on-issues: false
+          # Ratchet, not a big bang: `audit --gate new-only` fails the build on
+          # complexity this PR introduces, while excluding findings inherited
+          # from master. Turning fail-on-issues on without it would block every
+          # PR on ~11 pre-existing untested functions.
+          command: audit
+          gate: new-only
+          fail-on-issues: true

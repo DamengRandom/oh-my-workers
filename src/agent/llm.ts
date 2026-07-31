@@ -7,7 +7,7 @@ import { DEFAULT_LLM, DEFAULT_LLM_BASE_URL, LLM_FALLBACK_MODELS } from '../const
 // an empty result — which only blows up later inside LangChain as
 // `Cannot read properties of undefined (reading 'message')`, nowhere near the
 // real cause. Convert it to a real error here so retries and alerts can see it.
-const failLoudlyOnProviderError: typeof fetch = async (input, init) => {
+export const failLoudlyOnProviderError: typeof fetch = async (input, init) => {
   const res = await fetch(input, init)
 
   if (!res.ok || !res.headers.get('content-type')?.includes('application/json')) return res

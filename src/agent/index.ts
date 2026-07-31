@@ -1,33 +1,31 @@
-import { cleanupAgent } from './cleanup.agent.js'
 import { githubAgent } from './github.agent.js'
-import { manualKpiAgent } from './manual-kpi.agent.js'
 import { diaryAgent } from './diary.agent.js'
 import { curateTrending } from './news-curator.agent.js'
+import { cleanupTool } from '../tools/cleanup.tool.js'
+import { manualKpiTool } from '../tools/manual-kpi.tool.js'
 import { trendingTelegramTool } from '../tools/news-telegram.tool.js'
 import { trendingScrapeTool } from '../tools/trending-scrape.tool.js'
 import { saveKpiRecord, saveTrendingRepos } from '../storage/own-db.js'
-import { sectionLogger } from '../utils/logger.js'
+import { sectionLogger, logger } from '../utils/logger.js'
 import { notifyError, parseJson, toolOutput } from './utils.ts'
 import { AgentResult, CuratedRepo, TrendingRepo } from '../schemas/index.ts'
 import { runCuratorGraph } from './curator.graph.ts'
+import { toKpiRecord } from './kpi-record.ts'
 import { TRENDING_TOP_N } from '../constants/index.js'
 
 export class WorkCoordinator {
-  // ── Automated (crontab) — no human input required ─────────────────────────
-
+  // Deprecated SOON - because this is just for demo only
   static async runCleanup(): Promise<void> {
     const today = new Date().toISOString().split('T')[0]
 
     sectionLogger(`🧹 Oh My Workers — Cleanup — ${today}`)
 
     try {
-      await cleanupAgent.invoke({
-        messages: [{ role: 'user', content: 'Run the stale data cleanup now.' }],
-      })
+      await cleanupTool.invoke({})
       sectionLogger(`✅ Cleanup complete for ${today}`)
     } catch (err) {
-      console.error('❌ Cleanup agent failed:', err instanceof Error ? err.message : err)
-      await notifyError('Cleanup agent', err)
+      logger.error({ err }, '❌ Cleanup failed')
+      await notifyError('Cleanup', err)
     }
   }
 
@@ -35,70 +33,51 @@ export class WorkCoordinator {
 
   // Phase 2: ask the engineer for manual activities. Failures are non-critical,
   // so this swallows errors and returns an empty activity list.
-  private static async collectManualActivities(): Promise<{ manualResult: AgentResult | null; activities: string[] }> {
-    let manualResult: AgentResult | null = null
+  private static async collectManualActivities(): Promise<{ manualOutput: string; activities: string[] }> {
+    let manualOutput = ''
 
     try {
-      manualResult = await manualKpiAgent.invoke({
-        messages: [{ role: 'user', content: 'Ask the engineer what else they did today.' }],
-      })
+      manualOutput = await manualKpiTool.invoke({})
     } catch (err) {
-      console.error('❌ Manual KPI agent failed:', err instanceof Error ? err.message : err)
-      await notifyError('Manual KPI agent', err)
+      logger.error({ err }, '❌ Manual KPI input failed')
+      await notifyError('Manual KPI input', err)
       // non-critical — continue with GitHub data only
     }
 
-    let activities: string[] = []
+    const parsed = parseJson<{ activities?: string[] }>(manualOutput, {})
 
-    if (manualResult) {
-      const parsed = parseJson<{ activities?: string[] }>(toolOutput(manualResult, 'collect_manual_kpi_input'), {})
-      activities = parsed.activities ?? []
-    }
-
-    return { manualResult, activities }
+    return { manualOutput, activities: parsed.activities ?? [] }
   }
 
   // Phase 3a: no manual activities — persist a GitHub-only KPI record.
   private static async saveGithubOnlyKpi(githubResult: AgentResult, now: string): Promise<void> {
-    console.log('\n⏭️ No manual activities provided — skipping diary, saving GitHub KPI only.\n')
-
-    const githubData = parseJson<{ summary?: string; commits?: unknown[]; pullRequests?: unknown[] }>(
-      toolOutput(githubResult, 'fetch_github_activity'),
-      {}
-    )
+    logger.info('⏭️ No manual activities provided — skipping diary, saving GitHub KPI only.')
 
     try {
-      await saveKpiRecord({
-        github_summary: githubData.summary ?? '',
-        commits_count: (githubData.commits as unknown[])?.length ?? 0,
-        prs_count: (githubData.pullRequests as unknown[])?.length ?? 0,
-        activities: [],
-        created_at: now,
-        updated_at: now,
-      })
-      console.log('✅ GitHub KPI record saved.')
+      await saveKpiRecord(toKpiRecord(toolOutput(githubResult, 'fetch_github_activity'), now))
+      logger.info('✅ GitHub KPI record saved.')
     } catch (err) {
-      console.error('❌ Failed to save KPI record:', err instanceof Error ? err.message : err)
+      logger.error({ err }, '❌ Failed to save KPI record')
 
       await notifyError('saveKpiRecord', err)
     }
   }
 
-  // Phase 3b: manual activities present — generate and save the full KPI report.
-  private static async generateDiaryReport(githubResult: AgentResult, manualResult: AgentResult | null, activityCount: number): Promise<void> {
-    console.log(`\n⚡️ Phase 3: Generating daily KPI report (${activityCount} manual activities recorded)...\n`)
+  // Phase 4: manual activities present — generate and save the full KPI report.
+  private static async generateDiaryReport(githubResult: AgentResult, manualOutput: string, activityCount: number): Promise<void> {
+    logger.info(`⚡️ Phase 3: Generating daily KPI report (${activityCount} manual activities recorded)...`)
 
     try {
       await diaryAgent.invoke({
         messages: [
           {
             role: 'user',
-            content: `Write and save today's KPI report using the data below.\n\nGitHub activity:\n${toolOutput(githubResult, 'fetch_github_activity')}\n\nManual activities:\n${manualResult ? toolOutput(manualResult, 'collect_manual_kpi_input') : ''}`,
+            content: `Write and save today's KPI report using the data below.\n\nGitHub activity:\n${toolOutput(githubResult, 'fetch_github_activity')}\n\nManual activities:\n${manualOutput}`,
           },
         ],
       })
     } catch (err) {
-      console.error('❌ Diary agent failed:', err instanceof Error ? err.message : err)
+      logger.error({ err }, '❌ Diary agent failed')
 
       await notifyError('Diary agent', err)
     }
@@ -114,32 +93,29 @@ export class WorkCoordinator {
     sectionLogger(`🤖 Oh my workers — ${today}`)
 
     if (!username) {
-      console.error('❌ GitHub username not set in environment variables.')
+      logger.error('❌ GitHub username not set in environment variables.')
       await notifyError('Daily jobs startup', 'TARGET_GITHUB_USERNAME is not set')
       return
     }
 
     // ── Phase 1: Cleanup + GitHub run in parallel ────────────────────────────
-    console.log('⚡️ Phase 1: Running cleanup and GitHub fetch in parallel...\n')
+    logger.info('⚡️ Phase 1: Running cleanup and GitHub fetch in parallel...')
 
     const [cleanupSettled, githubSettled] = await Promise.allSettled([
-      cleanupAgent.invoke({
-        messages: [{ role: 'user', content: 'Run the stale data cleanup now.' }],
-      }),
+      cleanupTool.invoke({}),
       githubAgent.invoke({
         messages: [{ role: 'user', content: `Fetch GitHub activity for username "${username}" on date "${today}".` }],
       }),
     ])
 
     if (cleanupSettled.status === 'rejected') {
-      console.error('❌ Cleanup agent failed:', cleanupSettled.reason)
+      logger.error({ err: cleanupSettled.reason }, '❌ Cleanup failed')
 
-      await notifyError('Cleanup agent (daily jobs)', cleanupSettled.reason)
-      // non-critical — continue with GitHub + diary
+      await notifyError('Cleanup (daily jobs)', cleanupSettled.reason)
     }
 
     if (githubSettled.status === 'rejected') {
-      console.error('❌ GitHub agent failed:', githubSettled.reason)
+      logger.error({ err: githubSettled.reason }, '❌ GitHub agent failed')
 
       await notifyError('GitHub agent', githubSettled.reason)
 
@@ -149,15 +125,15 @@ export class WorkCoordinator {
     const githubResult = githubSettled.value
 
     // ── Phase 2: Manual input (interactive, sequential) ──────────────────────
-    console.log('\n⚡️ Phase 2: Collecting manual activities...')
+    logger.info('⚡️ Phase 2: Collecting manual activities...')
 
-    const { manualResult, activities } = await WorkCoordinator.collectManualActivities()
+    const { manualOutput, activities } = await WorkCoordinator.collectManualActivities()
 
     // ── Phase 3: Conditional — diary only if manual input was provided ────────
     if (activities.length === 0) {
       await WorkCoordinator.saveGithubOnlyKpi(githubResult, now)
     } else {
-      await WorkCoordinator.generateDiaryReport(githubResult, manualResult, activities.length)
+      await WorkCoordinator.generateDiaryReport(githubResult, manualOutput, activities.length)
     }
 
     sectionLogger(`✅ All jobs complete for ${today}`)
@@ -167,14 +143,14 @@ export class WorkCoordinator {
 
   // Step 1: scrape GitHub trending. Returns null on failure (already notified).
   private static async scrapeTrending(): Promise<TrendingRepo[] | null> {
-    console.log('⚡️ Scraping GitHub trending repos...\n')
+    logger.info('⚡️ Scraping GitHub trending repos...')
 
     try {
       const raw = await trendingScrapeTool.invoke({ languages: ['typescript', 'javascript'] })
 
       return JSON.parse(raw) as TrendingRepo[]
     } catch (err) {
-      console.error('❌ Trending scrape failed:', err instanceof Error ? err.message : err)
+      logger.error({ err }, '❌ Trending scrape failed')
 
       await notifyError('Trending scrape', err)
 
@@ -187,7 +163,7 @@ export class WorkCoordinator {
   private static rankByGrowth(newRepos: TrendingRepo[]): TrendingRepo[] {
     const top = [...newRepos].sort((a, b) => b.todayStars - a.todayStars).slice(0, TRENDING_TOP_N)
 
-    console.log(`📈 Top ${top.length} by stars gained today: ${top[0]?.todayStars ?? 0} down to ${top.at(-1)?.todayStars ?? 0}`)
+    logger.info(`📈 Top ${top.length} by stars gained today: ${top[0]?.todayStars ?? 0} down to ${top.at(-1)?.todayStars ?? 0}`)
 
     return top
   }
@@ -195,12 +171,12 @@ export class WorkCoordinator {
   // Step 3: write summaries for the ranked repos. One attempt — retries and final
   // failure notification are handled by runCuratorGraph / runNewsAgent.
   private static async curateRepos(newRepos: TrendingRepo[], feedback?: string): Promise<string> {
-    console.log('⚡️ Writing digest summaries...\n')
+    logger.info('⚡️ Writing digest summaries...')
 
     try {
       return await curateTrending(newRepos, feedback)
     } catch (err) {
-      console.error('❌ Trending curation attempt failed:', err instanceof Error ? err.message : err)
+      logger.error({ err }, '❌ Trending curation attempt failed')
 
       return ''
     }
@@ -208,13 +184,13 @@ export class WorkCoordinator {
 
   // Step 4: deliver the digest via Telegram. Returns whether the send succeeded.
   private static async sendTelegram(repos: CuratedRepo[]): Promise<boolean> {
-    console.log('⚡️ Sending trending digest via Telegram...\n')
+    logger.info('⚡️ Sending trending digest via Telegram...')
 
     try {
       await trendingTelegramTool.invoke({ repos })
       return true
     } catch (err) {
-      console.error('❌ Telegram delivery failed:', err instanceof Error ? err.message : err)
+      logger.error({ err }, '❌ Telegram delivery failed')
       await notifyError('Trending Telegram delivery', err)
       return false
     }
@@ -238,9 +214,9 @@ export class WorkCoordinator {
           updated_at: now,
         }))
       )
-      console.log(`✅ Saved ${repos.length} trending repos to database.`)
+      logger.info(`✅ Saved ${repos.length} trending repos to database.`)
     } catch (err) {
-      console.error('❌ Failed to save trending repos:', err instanceof Error ? err.message : err)
+      logger.error({ err }, '❌ Failed to save trending repos')
       await notifyError('saveTrendingRepos', err)
     }
   }
@@ -258,7 +234,7 @@ export class WorkCoordinator {
     if (!allRepos) return
 
     if (!allRepos.length) {
-      console.log('⏭️ No trending repos found — skipping.\n')
+      logger.info('⏭️ No trending repos found — skipping.')
       return
     }
 
@@ -269,7 +245,7 @@ export class WorkCoordinator {
     const { curated, error } = await runCuratorGraph(topRepos, WorkCoordinator.curateRepos)
 
     if (!curated) {
-      console.error('❌ Trending curation failed after retries:', error)
+      logger.error({ err: error }, '❌ Trending curation failed after retries')
 
       await notifyError('Trending curator agent', error ?? 'curation failed after retries')
 
@@ -277,7 +253,7 @@ export class WorkCoordinator {
     }
 
     if (!curated.length) {
-      console.log('⏭️ No repos curated — skipping send and save.\n')
+      logger.info('⏭️ No repos curated — skipping send and save.')
       return
     }
 

@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js'
 import { AgentResult } from '../schemas/index.ts'
 
 export function toolOutput(result: AgentResult, toolName: string): string {
@@ -43,6 +44,6 @@ export async function notifyError(context: string, error: unknown): Promise<void
       body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'HTML' }),
     })
   } catch (error) {
-    console.error('Failed to notify error to Telegram', { message: error instanceof Error ? error.message : String(error) })
+    logger.error({ err: error }, 'Failed to notify error to Telegram')
   }
 }

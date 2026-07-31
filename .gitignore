@@ -9,3 +9,6 @@ dist/
 .claude
 commands/
 hooks/
+
+# coverage reports (generated for Fallow CRAP scoring)
+coverage/

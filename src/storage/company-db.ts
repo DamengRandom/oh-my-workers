@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js'
 import { Pool } from 'pg'
 import type { CleanupResult } from '../schemas/index.js'
 import { saveCleanupLog } from './own-db.js'
@@ -29,7 +30,7 @@ export async function deleteStaleCompanyRecords(): Promise<CleanupResult> {
     const result = await pool.query(`DELETE FROM "${table}" WHERE created_at < $1`, [cutoff.toISOString()])
 
     deleted_count = result.rowCount ?? 0
-    console.log(`✓ Deleted ${deleted_count} stale records from "${table}" (older than ${thresholdDays} days)`)
+    logger.info(`✓ Deleted ${deleted_count} stale records from "${table}" (older than ${thresholdDays} days)`)
   } catch (err) {
     failed_count = 1
     status = 'failed'
@@ -37,7 +38,7 @@ export async function deleteStaleCompanyRecords(): Promise<CleanupResult> {
     const message = err instanceof Error ? err.message : String(err)
 
     errors.push(message)
-    console.error(`✗ Cleanup failed for "${table}": ${message}`)
+    logger.error(`✗ Cleanup failed for "${table}": ${message}`)
   }
 
   const cleanupResult: CleanupResult = {

@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js'
 import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
 import * as fs from 'fs'
@@ -45,7 +46,7 @@ export const diaryTool = new DynamicStructuredTool({
 
     fs.writeFileSync(filePath, `# Daily KPI Report — ${dateStr}\n\n${report_content}`)
 
-    console.log(`✅ KPI report saved to database and ${filePath}`)
+    logger.info(`✅ KPI report saved to database and ${filePath}`)
 
     return JSON.stringify({ success: true, date: dateStr, file: filePath })
   },
