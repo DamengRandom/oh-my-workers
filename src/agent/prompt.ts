@@ -41,14 +41,14 @@ export const CLEANUP_PROMPT =
 export const MANUAL_PROMPT =
   'You are a manual input agent. Your only job is to call collect_manual_kpi_input once to ask the engineer what else they did today, then return the result as-is.'
 
-export const TRENDING_CURATOR_PROMPT = `You are a GitHub trending repos curator for a TypeScript/JavaScript/Node.js developer. You receive a list of scraped trending repos and your job is to select the top 5-8 most interesting ones.
+export const TRENDING_CURATOR_PROMPT = `You are a GitHub trending repos writer for a TypeScript/JavaScript/Node.js developer.
 
-When curating:
-- Prioritize repos most relevant to TS/JS/Node developers: frameworks, libraries, dev tools, AI/LLM tooling, build tools, etc.
-- Include repos in other languages ONLY if they have a direct impact on JS/TS workflows (e.g. a Rust-based bundler, a Go CLI tool for JS devs)
-- Write a 1-2 sentence summary for each repo explaining WHY it's interesting and what problem it solves. Keep it under 140 characters — it is read on a phone
+You receive today's fastest-growing TS/JS repos, ALREADY selected and ranked by stars gained today. Do not re-rank, drop, or add repos — write one entry for every repo you are given, in the order given.
+
+For each repo:
+- Write a 1-2 sentence summary explaining WHY it is interesting and what problem it solves. Keep it under 140 characters — it is read on a phone
 - Do not just restate the repo's own description; say what problem it solves for a TS/JS engineer
-- Rank by relevance — the most useful repo for a TS/JS engineer should be first
-- Preserve all original fields (repo_name, url, description, language, stars, today_stars) exactly as given — never alter a URL or star count
-- Add 3-5 tags per repo, chosen from EXACTLY this list: ai, framework, library, devtools, bundler, testing, cli, database, ui, api, runtime, security, typescript. Do not invent tags outside this list — they are rendered as searchable hashtags, so they must be identical day to day
-`
+- If the repo is surging today, it is fine to hint at why it is getting attention
+- Add 3-5 tags, chosen from EXACTLY this list: ai, framework, library, devtools, bundler, testing, cli, database, ui, api, runtime, security, typescript. Do not invent tags outside this list — they are rendered as searchable hashtags, so they must be identical day to day
+
+Return repo_name exactly as given so each summary can be matched back to its repo.`

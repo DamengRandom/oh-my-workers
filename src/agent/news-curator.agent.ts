@@ -1,21 +1,63 @@
 import { z } from 'zod'
 import { createLlm } from './llm.js'
 import { TRENDING_CURATOR_PROMPT } from './prompt.js'
-import { TrendingRepoOutputSchema } from '../schemas/index.js'
+import type { TrendingRepo } from '../schemas/index.js'
 
-const CuratedOutputSchema = z.object({ repos: z.array(TrendingRepoOutputSchema) })
+// The model only writes prose. Star counts, URLs and ordering come from the
+// scrape, so no amount of hallucination can corrupt the numbers on the digest.
+const SummarySchema = z.object({
+  repos: z.array(
+    z.object({
+      repo_name: z.string(),
+      summary: z.string(),
+      tags: z.array(z.string()),
+    })
+  ),
+})
+
+// Exported for testing: merges model prose back onto the authoritative scraped
+// rows, preserving the caller's (star-growth) ordering and dropping any repo the
+// model invented.
+export function mergeSummaries(repos: TrendingRepo[], summaries: z.infer<typeof SummarySchema>['repos']) {
+  const byName = new Map(summaries.map((s) => [s.repo_name, s]))
+
+  return repos.flatMap((r) => {
+    const s = byName.get(r.name)
+
+    if (!s) return []
+
+    return [
+      {
+        repo_name: r.name,
+        url: r.url,
+        description: r.description,
+        language: r.language,
+        stars: r.stars,
+        today_stars: r.todayStars,
+        summary: s.summary,
+        tags: s.tags,
+      },
+    ]
+  })
+}
 
 // ponytail: one structured-output call, not an agent. The old curate_trending_repos
 // tool just echoed its own input back, so the tool loop bought nothing — and its
 // post-tool "done" model call is what threw away a good 92s curation when the
 // provider returned an error body with no choices. Retries live in curator.graph.
-export async function curateTrending(content: string): Promise<string> {
+export async function curateTrending(repos: TrendingRepo[], feedback?: string): Promise<string> {
+  const listing = repos.map((r) => `${r.name} (${r.todayStars} stars today, ${r.stars} total, ${r.language}) — ${r.description}`).join('\n')
+
+  const content = feedback
+    ? `Write the digest entries for these repos:\n\n${listing}\n\nYour previous response could not be parsed (${feedback}). Return output matching the required schema exactly.`
+    : `Write the digest entries for these repos:\n\n${listing}`
+
   const result = await createLlm(0.5)
-    .withStructuredOutput(CuratedOutputSchema)
+    .withStructuredOutput(SummarySchema)
     .invoke([
       { role: 'system', content: TRENDING_CURATOR_PROMPT },
       { role: 'user', content },
     ])
 
-  return JSON.stringify(result)
+  return JSON.stringify({ repos: mergeSummaries(repos, result.repos) })
 }

@@ -10,10 +10,9 @@ import { sectionLogger } from '../utils/logger.js'
 import { notifyError, parseJson, toolOutput } from './utils.ts'
 import { AgentResult, CuratedRepo, TrendingRepo } from '../schemas/index.ts'
 import { runCuratorGraph } from './curator.graph.ts'
+import { TRENDING_TOP_N } from '../constants/index.js'
 
 export class WorkCoordinator {
-  // ── Automated (crontab) — no human input required ─────────────────────────
-
   static async runCleanup(): Promise<void> {
     const today = new Date().toISOString().split('T')[0]
 
@@ -196,17 +195,23 @@ export class WorkCoordinator {
     }
   }
 
-  // Step 3: curate + summarize via LLM. One attempt — retries and final
+  // Step 2b: rank by stars gained today and keep the top N. Selection is a sort,
+  // not a judgement call — the model never sees the repos that lost.
+  private static rankByGrowth(newRepos: TrendingRepo[]): TrendingRepo[] {
+    const top = [...newRepos].sort((a, b) => b.todayStars - a.todayStars).slice(0, TRENDING_TOP_N)
+
+    console.log(`📈 Top ${top.length} by stars gained today: ${top[0]?.todayStars ?? 0} down to ${top.at(-1)?.todayStars ?? 0}`)
+
+    return top
+  }
+
+  // Step 3: write summaries for the ranked repos. One attempt — retries and final
   // failure notification are handled by runCuratorGraph / runNewsAgent.
   private static async curateRepos(newRepos: TrendingRepo[], feedback?: string): Promise<string> {
-    console.log('⚡️ Curating top repos...\n')
-
-    const content = feedback
-      ? `Curate the top trending GitHub repos from these results. Pick the top 5-8 most interesting ones:\n\n${JSON.stringify(newRepos)}\n\nYour previous response could not be parsed (${feedback}). Return output matching the required schema exactly.`
-      : `Curate the top trending GitHub repos from these results. Pick the top 5-8 most interesting ones:\n\n${JSON.stringify(newRepos)}`
+    console.log('⚡️ Writing digest summaries...\n')
 
     try {
-      return await curateTrending(content)
+      return await curateTrending(newRepos, feedback)
     } catch (err) {
       console.error('❌ Trending curation attempt failed:', err instanceof Error ? err.message : err)
 
@@ -278,8 +283,11 @@ export class WorkCoordinator {
       return
     }
 
-    // ── Step 3: Curate and summarize via LLM ────────────────────────────────
-    const { curated, error } = await runCuratorGraph(newRepos, WorkCoordinator.curateRepos)
+    // ── Step 2b: Rank by stars gained today, keep the top N ─────────────────
+    const topRepos = WorkCoordinator.rankByGrowth(newRepos)
+
+    // ── Step 3: Write summaries via LLM ─────────────────────────────────────
+    const { curated, error } = await runCuratorGraph(topRepos, WorkCoordinator.curateRepos)
 
     if (!curated) {
       console.error('❌ Trending curation failed after retries:', error)
