@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js'
 import 'dotenv/config'
 import { Pool } from 'pg'
 
@@ -22,13 +23,13 @@ async function main(): Promise<void> {
     )
     const { total, names } = before.rows[0]
 
-    console.log(`target      : ${hostname}`)
-    console.log(`rows        : ${total}`)
-    console.log(`distinct    : ${names}`)
-    console.log(`to delete   : ${total - names}`)
+    logger.info(`target      : ${hostname}`)
+    logger.info(`rows        : ${total}`)
+    logger.info(`distinct    : ${names}`)
+    logger.info(`to delete   : ${total - names}`)
 
     if (!apply) {
-      console.log('\nDRY RUN — nothing changed. Re-run with --apply to delete the older duplicate rows.')
+      logger.info('DRY RUN — nothing changed. Re-run with --apply to delete the older duplicate rows.')
       return
     }
 
@@ -46,15 +47,15 @@ async function main(): Promise<void> {
       'SELECT COUNT(*)::int total, COUNT(DISTINCT repo_name)::int names FROM github_trending'
     )
 
-    console.log(`\ndeleted     : ${deleted.rowCount}`)
-    console.log(`rows now    : ${after.rows[0].total} (${after.rows[0].names} distinct)`)
-    console.log('unique index: created ✅')
+    logger.info(`deleted     : ${deleted.rowCount}`)
+    logger.info(`rows now    : ${after.rows[0].total} (${after.rows[0].names} distinct)`)
+    logger.info('unique index: created ✅')
   } finally {
     await pool.end()
   }
 }
 
 main().catch((err) => {
-  console.error('❌ Migration failed:', err instanceof Error ? err.message : err)
+  logger.error({ err }, '❌ Migration failed')
   process.exit(1)
 })

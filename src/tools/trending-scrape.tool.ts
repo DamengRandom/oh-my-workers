@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js'
 import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
 import { TrendingRepo } from '../schemas/index.ts'
@@ -60,7 +61,7 @@ export const trendingScrapeTool = new DynamicStructuredTool({
       const response = await fetch(url)
 
       if (!response.ok) {
-        console.error(`❌ Failed to fetch trending/${lang}: ${response.status}`)
+        logger.error(`❌ Failed to fetch trending/${lang}: ${response.status}`)
         continue
       }
 
@@ -75,7 +76,7 @@ export const trendingScrapeTool = new DynamicStructuredTool({
       }
     }
 
-    console.log(`🔍 Scraped ${allRepos.length} trending repos from GitHub`)
+    logger.info(`🔍 Scraped ${allRepos.length} trending repos from GitHub`)
 
     return JSON.stringify(allRepos)
   },

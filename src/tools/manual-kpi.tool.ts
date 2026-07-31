@@ -1,6 +1,7 @@
 import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
 import * as readline from 'readline'
+import { logger, prompt } from '../utils/logger.js'
 
 function promptUser(question: string): Promise<string> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
@@ -24,17 +25,19 @@ async function collectActivities(): Promise<string[]> {
       .map((a) => a.trim())
       .filter((a) => a.length > 0)
 
-    console.log(`\n📝 Activities received from GitHub Actions input (${activities.length}) on ${now}:`)
-    activities.forEach((a) => console.log(`  - ${a}`))
+    // non-interactive: this is a log, not a prompt
+    logger.info({ activities, at: now }, `📝 Activities received from GitHub Actions input (${activities.length})`)
 
     return activities
   }
 
-  // Local mode: interactive readline prompt
-  console.log('\n──────────────────────────────────────────')
-  console.log('📝 Anything else you did today?')
-  console.log('📝 (Enter each activity on a new line)')
-  console.log('📝 Type "done" when finished.\n')
+  // Local mode: interactive readline prompt. These go straight to stdout — a
+  // timestamped, levelled log line would not read as a question, and pino's
+  // stream does not interleave predictably with readline's own output.
+  prompt('\n──────────────────────────────────────────')
+  prompt('📝 Anything else you did today?')
+  prompt('📝 (Enter each activity on a new line)')
+  prompt('📝 Type "done" when finished.\n')
 
   const activities: string[] = []
 
@@ -45,7 +48,7 @@ async function collectActivities(): Promise<string[]> {
     if (input.length > 0) activities.push(input)
   }
 
-  console.log('──────────────────────────────────────────\n')
+  prompt('──────────────────────────────────────────\n')
 
   return activities
 }
@@ -59,7 +62,7 @@ export const manualKpiTool = new DynamicStructuredTool({
     const now = new Date().toISOString()
     const activities = await collectActivities()
 
-    console.log(`✅ Recorded ${activities.length} manual activities`)
+    logger.info(`✅ Recorded ${activities.length} manual activities`)
 
     return JSON.stringify({ activities, created_at: now, updated_at: now })
   },

@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js'
 import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
 import { deleteStaleCompanyRecords } from '../storage/company-db.js'
@@ -12,11 +13,11 @@ export const cleanupTool = new DynamicStructuredTool({
     const table = COMPANY_CLEANUP_TABLE
     const days = COMPANY_CLEANUP_THRESHOLD_DAYS
 
-    console.log(`➡️ Running cleanup on "${table}" (threshold: ${days} days)...`)
+    logger.info(`➡️ Running cleanup on "${table}" (threshold: ${days} days)...`)
 
     const result = await deleteStaleCompanyRecords()
 
-    console.log(`✅ Cleanup complete: ${result.deleted_count} deleted, ${result.failed_count} failed, status: ${result.status}`)
+    logger.info(`✅ Cleanup complete: ${result.deleted_count} deleted, ${result.failed_count} failed, status: ${result.status}`)
 
     return JSON.stringify(result)
   },

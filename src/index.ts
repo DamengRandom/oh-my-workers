@@ -1,14 +1,15 @@
+import { logger } from './utils/logger.js'
 import 'dotenv/config'
 import { initDb } from './storage/own-db.js'
 import { jobs, findJobByCliArg } from './jobs/registry.js'
 
 function printJobs(): void {
-  console.log('Available jobs 📋:')
+  logger.info('Available jobs 📋:')
 
   for (const j of jobs) {
     const scheduledJobs = j.schedule ? ` [${j.schedule}]` : ' [manual]'
 
-    console.log(`  --job=${j.name}${scheduledJobs}  — ${j.description}`)
+    logger.info(`  --job=${j.name}${scheduledJobs}  — ${j.description}`)
   }
 }
 
@@ -17,7 +18,7 @@ async function main(): Promise<void> {
   if (process.argv.includes('--setup')) {
     await initDb()
 
-    console.log('✅ Database setup complete.')
+    logger.info('✅ Database setup complete.')
     process.exit(0)
   }
 
@@ -39,13 +40,13 @@ async function main(): Promise<void> {
 
   // No recognized args — scheduling is handled by GitHub Actions, not an
   // in-process daemon. Point the user at the actual options instead.
-  console.log('No job specified. Use --job=<name> to run one, or --list-jobs to see all.\n')
+  logger.info('No job specified. Use --job=<name> to run one, or --list-jobs to see all.')
   printJobs()
   process.exit(0)
 }
 
 main().catch((err) => {
-  console.error('Fatal system error ⚠️❌⚠️❌: ', err)
+  logger.error('Fatal system error ⚠️❌⚠️❌: ', err)
 
   process.exit(1)
 })
