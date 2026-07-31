@@ -15,6 +15,9 @@ export const AI_NEWS_TOP_N = 4
 export const AI_NEWS_FETCH_N = 10
 export const AI_NEWS_LOOKBACK_DAYS = 1
 export const AI_NEWS_SNIPPET_MAX = 200
+// Telegram drops the whole message past 4096 chars rather than truncating, and
+// titleOf falls back to the full url when Tavily returns a blank title.
+export const AI_NEWS_TITLE_MAX = 200
 // Tavily's `score` is relevance to this query, not popularity — a vague query
 // like "artificial intelligence" scores wellness blogs above model launches.
 // Digest quality lives here and in AI_NEWS_DOMAINS, not in the ranking.
@@ -46,5 +49,5 @@ export const AI_NEWS_DOMAINS = [
 
 export const DEFAULT_CRONJOB_TIME = '0 17 * * *'
 export const DEFAULT_CRONJOB_TIMEZONE = 'Australia/Sydney' // Change to Your local time zone when you need to use this constant value
-export const NEWS_CRON_TIME = '0 22 * * *' // 8:00 AM AEST (UTC+10) / 9:00 AM AEDT (UTC+11, Oct-Apr)
-export const AI_NEWS_CRON_TIME = '30 22 * * *' // 8:30 AM AEST — 30 min after the trending digest
+export const NEWS_CRON_TIME = '0 8 * * *' // 8:00 AM Sydney
+export const AI_NEWS_CRON_TIME = '30 8 * * *' // 8:30 AM Sydney — 30 min after the trending digest

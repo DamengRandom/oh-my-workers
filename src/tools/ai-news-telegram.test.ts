@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { aiNewsTelegramTool, buildAiNewsMessage } from './ai-news-telegram.tool.ts'
-import { AI_NEWS_SNIPPET_MAX, AI_NEWS_TOP_N } from '../constants/index.ts'
+import { AI_NEWS_SNIPPET_MAX, AI_NEWS_TITLE_MAX, AI_NEWS_TOP_N } from '../constants/index.ts'
 import type { AiNewsItem } from '../schemas/index.ts'
 
 const story = (over: Partial<AiNewsItem> = {}): AiNewsItem => ({
@@ -41,6 +41,24 @@ test('truncates an over-long snippet at the bound', () => {
   assert.ok(italics[1].endsWith('…'))
 })
 
+test('truncates an over-long title at the bound', () => {
+  const message = buildAiNewsMessage([story({ title: 'T'.repeat(AI_NEWS_TITLE_MAX + 200) })], '2026-07-31')
+  const bold = message.match(/1️⃣ <b>(.*?)<\/b>/)
+
+  assert.ok(bold)
+  assert.equal(bold[1].length, AI_NEWS_TITLE_MAX)
+  assert.ok(bold[1].endsWith('…'))
+})
+
+test('escapes a quote in the url so it cannot close the href attribute early', () => {
+  const message = buildAiNewsMessage([story({ url: 'https://example.com/a"onmouseover="x' })], '2026-07-31')
+
+  assert.match(message, /<a href="https:\/\/example\.com\/a&quot;onmouseover=&quot;x">Read more<\/a>/)
+  // exactly two quotes on that line — the ones the digest itself emits
+  const href = message.split('\n').find((l) => l.includes('<a href='))
+  assert.equal(href?.match(/"/g)?.length, 2)
+})
+
 test('omits the snippet line entirely when Tavily returned an empty excerpt', () => {
   const message = buildAiNewsMessage([story({ snippet: '' })], '2026-07-31')
 
@@ -58,12 +76,16 @@ test('counts stories with the right plural', () => {
 })
 
 // Telegram rejects the whole message past 4096, so a digest that overflows is
-// not truncated — it is lost. At AI_NEWS_TOP_N=4 the worst case is ~2100, but
-// titles are unbounded, and 8 such entries would land at ~4105. This test fails
-// if TOP_N is raised past what the format can carry.
+// not truncated — it is lost. Title and snippet are both bounded now, so this
+// really is the worst case, and it fails if TOP_N is raised past what the
+// format can carry.
 test('a worst-case digest stays inside the 4096-char limit Telegram hard-fails at', () => {
   const worst = Array.from({ length: AI_NEWS_TOP_N }, () =>
-    story({ title: 'T'.repeat(120), snippet: 's'.repeat(AI_NEWS_SNIPPET_MAX + 500), url: `https://example.com/${'u'.repeat(80)}` })
+    story({
+      title: 'T'.repeat(AI_NEWS_TITLE_MAX + 500),
+      snippet: 's'.repeat(AI_NEWS_SNIPPET_MAX + 500),
+      url: `https://example.com/${'u'.repeat(80)}`,
+    })
   )
 
   assert.ok(buildAiNewsMessage(worst, '2026-07-31').length < 4096)

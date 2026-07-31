@@ -70,7 +70,7 @@ export class WorkCoordinator {
     logger.info(`⚡️ Phase 3: Generating daily KPI report (${activityCount} manual activities recorded)...`)
 
     try {
-      await diaryAgent.invoke({
+      await diaryAgent().invoke({
         messages: [
           {
             role: 'user',
@@ -105,7 +105,7 @@ export class WorkCoordinator {
 
     const [cleanupSettled, githubSettled] = await Promise.allSettled([
       cleanupTool.invoke({}),
-      githubAgent.invoke({
+      githubAgent().invoke({
         messages: [{ role: 'user', content: `Fetch GitHub activity for username "${username}" on date "${today}".` }],
       }),
     ])
