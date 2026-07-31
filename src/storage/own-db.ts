@@ -49,6 +49,10 @@ export async function initDb(): Promise<void> {
       created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    -- saveTrendingRepos upserts on this. Fails if the table already holds
+    -- duplicate repo_names — run scripts/dedupe-trending.ts first.
+    CREATE UNIQUE INDEX IF NOT EXISTS github_trending_repo_name_key ON github_trending (repo_name);
   `)
   console.log('✅ Own database tables ready')
 }
@@ -75,19 +79,24 @@ export async function saveCleanupLog(result: CleanupResult, tableName: string): 
   )
 }
 
-export async function getRecentRepoNames(days: number = 7): Promise<Set<string>> {
-  const result = await pool.query<{ repo_name: string }>(
-    `SELECT DISTINCT repo_name FROM github_trending WHERE created_at > NOW() - INTERVAL '1 day' * $1`,
-    [days]
-  )
-  return new Set(result.rows.map((r) => r.repo_name))
-}
-
+// One row per repo. A repo that trends again updates in place — star counts stay
+// current instead of going stale behind a dedup filter. created_at keeps its
+// original value, so it still reads as "first seen".
 export async function saveTrendingRepos(repos: TrendingRepoLog[]): Promise<void> {
   for (const repo of repos) {
     await pool.query(
       `INSERT INTO github_trending (repo_name, url, description, language, stars, today_stars, summary, tags, sent, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       ON CONFLICT (repo_name) DO UPDATE SET
+         url         = EXCLUDED.url,
+         description = EXCLUDED.description,
+         language    = EXCLUDED.language,
+         stars       = EXCLUDED.stars,
+         today_stars = EXCLUDED.today_stars,
+         summary     = EXCLUDED.summary,
+         tags        = EXCLUDED.tags,
+         sent        = EXCLUDED.sent,
+         updated_at  = EXCLUDED.updated_at`,
       [
         repo.repo_name,
         repo.url,

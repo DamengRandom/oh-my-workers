@@ -5,7 +5,7 @@ import { diaryAgent } from './diary.agent.js'
 import { curateTrending } from './news-curator.agent.js'
 import { trendingTelegramTool } from '../tools/news-telegram.tool.js'
 import { trendingScrapeTool } from '../tools/trending-scrape.tool.js'
-import { saveKpiRecord, saveTrendingRepos, getRecentRepoNames } from '../storage/own-db.js'
+import { saveKpiRecord, saveTrendingRepos } from '../storage/own-db.js'
 import { sectionLogger } from '../utils/logger.js'
 import { notifyError, parseJson, toolOutput } from './utils.ts'
 import { AgentResult, CuratedRepo, TrendingRepo } from '../schemas/index.ts'
@@ -13,6 +13,8 @@ import { runCuratorGraph } from './curator.graph.ts'
 import { TRENDING_TOP_N } from '../constants/index.js'
 
 export class WorkCoordinator {
+  // ── Automated (crontab) — no human input required ─────────────────────────
+
   static async runCleanup(): Promise<void> {
     const today = new Date().toISOString().split('T')[0]
 
@@ -180,22 +182,7 @@ export class WorkCoordinator {
     }
   }
 
-  // Step 2: drop repos seen in the last 7 days. Falls back to all repos on error.
-  private static async dedupRepos(allRepos: TrendingRepo[]): Promise<TrendingRepo[]> {
-    console.log('⚡️ Deduplicating against recent repos...\n')
-
-    try {
-      const recentNames = await getRecentRepoNames(7)
-      const newRepos = allRepos.filter((r) => !recentNames.has(r.name))
-      console.log(`📊 ${allRepos.length} scraped, ${allRepos.length - newRepos.length} duplicates removed, ${newRepos.length} new`)
-      return newRepos
-    } catch (err) {
-      console.error('⚠️ Dedup query failed, proceeding with all repos:', err instanceof Error ? err.message : err)
-      return allRepos
-    }
-  }
-
-  // Step 2b: rank by stars gained today and keep the top N. Selection is a sort,
+  // Step 2: rank by stars gained today and keep the top N. Selection is a sort,
   // not a judgement call — the model never sees the repos that lost.
   private static rankByGrowth(newRepos: TrendingRepo[]): TrendingRepo[] {
     const top = [...newRepos].sort((a, b) => b.todayStars - a.todayStars).slice(0, TRENDING_TOP_N)
@@ -275,16 +262,8 @@ export class WorkCoordinator {
       return
     }
 
-    // ── Step 2: Dedup against recent DB entries ─────────────────────────────
-    const newRepos = await WorkCoordinator.dedupRepos(allRepos)
-
-    if (!newRepos.length) {
-      console.log('⏭️ All repos already sent recently — skipping.\n')
-      return
-    }
-
-    // ── Step 2b: Rank by stars gained today, keep the top N ─────────────────
-    const topRepos = WorkCoordinator.rankByGrowth(newRepos)
+    // ── Step 2: Rank by stars gained today, keep the top N ──────────────────
+    const topRepos = WorkCoordinator.rankByGrowth(allRepos)
 
     // ── Step 3: Write summaries via LLM ─────────────────────────────────────
     const { curated, error } = await runCuratorGraph(topRepos, WorkCoordinator.curateRepos)
