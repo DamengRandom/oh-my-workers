@@ -320,6 +320,41 @@ export class WorkCoordinator {
     sectionLogger(`✅ AI News job complete for ${today}`)
   }
 
+  // Steps 1-2 together: scrape, then rank. Returns null when there is nothing
+  // worth curating — a failed scrape (already notified) or an empty page.
+  private static async collectTopRepos(): Promise<TrendingRepo[] | null> {
+    const allRepos = await WorkCoordinator.scrapeTrending()
+    if (!allRepos) return null
+
+    if (!allRepos.length) {
+      logger.info('⏭️ No trending repos found — skipping.')
+      return null
+    }
+
+    return WorkCoordinator.rankByGrowth(allRepos)
+  }
+
+  // Step 3 with its failure handling: null means stop, and the alert has already
+  // been sent. An empty result is a skip, not a failure — nothing to alert on.
+  private static async curateOrNotify(topRepos: TrendingRepo[]): Promise<CuratedRepo[] | null> {
+    const { curated, error } = await runCuratorGraph(topRepos, WorkCoordinator.curateRepos)
+
+    if (!curated) {
+      logger.error({ err: error }, '❌ Trending curation failed after retries')
+
+      await notifyError('Trending curator agent', error ?? 'curation failed after retries')
+
+      return null
+    }
+
+    if (!curated.length) {
+      logger.info('⏭️ No repos curated — skipping send and save.')
+      return null
+    }
+
+    return curated
+  }
+
   // ── Daily GitHub Trending — scrape, dedup, curate, send via Telegram ─────
 
   static async runNewsAgent(): Promise<void> {
@@ -328,33 +363,13 @@ export class WorkCoordinator {
 
     sectionLogger(`🤖 Oh My Workers — GitHub Trending — ${today}`)
 
-    // ── Step 1: Scrape GitHub trending ──────────────────────────────────────
-    const allRepos = await WorkCoordinator.scrapeTrending()
-    if (!allRepos) return
-
-    if (!allRepos.length) {
-      logger.info('⏭️ No trending repos found — skipping.')
-      return
-    }
-
-    // ── Step 2: Rank by stars gained today, keep the top N ──────────────────
-    const topRepos = WorkCoordinator.rankByGrowth(allRepos)
+    // ── Steps 1-2: Scrape GitHub trending, rank, keep the top N ─────────────
+    const topRepos = await WorkCoordinator.collectTopRepos()
+    if (!topRepos) return
 
     // ── Step 3: Write summaries via LLM ─────────────────────────────────────
-    const { curated, error } = await runCuratorGraph(topRepos, WorkCoordinator.curateRepos)
-
-    if (!curated) {
-      logger.error({ err: error }, '❌ Trending curation failed after retries')
-
-      await notifyError('Trending curator agent', error ?? 'curation failed after retries')
-
-      return
-    }
-
-    if (!curated.length) {
-      logger.info('⏭️ No repos curated — skipping send and save.')
-      return
-    }
+    const curated = await WorkCoordinator.curateOrNotify(topRepos)
+    if (!curated) return
 
     // ── Step 4: Send via Telegram ───────────────────────────────────────────
     const sent = await WorkCoordinator.sendTelegram(curated)
