@@ -4,6 +4,7 @@ A personal AI agent suite for software engineers. Runs daily jobs automatically 
 
 - **5pm Sydney** — fetches GitHub activity, asks what else you did, generates a KPI diary report
 - **8am Sydney** — scrapes GitHub trending repos (TypeScript/JavaScript), ranks them by stars gained today, has an LLM write the summaries, delivers via Telegram
+- **8:30am Sydney** — searches AI technology news via Tavily (new models, dev tools, releases), drops stories already sent, delivers the top 4 via Telegram
 
 Built with TypeScript, LangChain/LangGraph, and any OpenAI-compatible LLM (defaults to OpenRouter, free tier). More detail in the [wiki](https://github.com/DamengRandom/oh-my-workers/wiki).
 
@@ -23,6 +24,17 @@ Scrape (TS + JS) → Rank by stars gained today (top 8) → LLM writes summaries
 Selection is a sort, not a judgement call: the model only writes prose, and star counts, URLs and ordering come from the scrape, so it cannot corrupt the numbers on the digest.
 
 The curator is a small LangGraph retry loop: if the LLM's output doesn't parse, it retries once with the parse error as feedback; if it still fails, the job alerts you via Telegram instead of failing silently. See [Curator Retry Graph](https://github.com/DamengRandom/oh-my-workers/wiki/Curator-Retry-Graph).
+
+**AI news pipeline (8:30am):**
+```
+Tavily search (last 24h, tech press + dev blogs) → drop urls already sent → top 4 → Telegram → saved to DB
+```
+
+Scope is AI *technology* — new models, developer tools, releases. Finance-led outlets are deliberately absent: their AI coverage is funding rounds and stock moves, not software.
+
+No model in this pipeline — Tavily's own article excerpts are the summaries, so there is nothing to hallucinate and nothing to retry.
+
+Tavily's `score` is relevance to the query, not popularity: search `"artificial intelligence"` and a wellness blog outscores a model launch. So digest quality lives in `AI_NEWS_QUERY` and `AI_NEWS_DOMAINS`, and ranking is simply Tavily's own order. It fetches 10 to send 4 — dedupe drops stories already delivered, and the slack keeps the digest full.
 
 ---
 
@@ -47,6 +59,7 @@ DATABASE_URL=postgresql://postgres:password@localhost:5432/work_coordinator
 COMPANY_DB_URL=postgresql://user:password@company-host:5432/company_db
 TELEGRAM_BOT_TOKEN=        # @BotFather on Telegram → /newbot
 TELEGRAM_CHAT_ID=          # message @userinfobot, then start your bot first
+TAVILY_API_KEY=            # app.tavily.com → API Keys (free tier works)
 ```
 
 `LANGSMITH_TRACING` / `LANGSMITH_API_KEY` / `LANGSMITH_PROJECT` are optional (see below). Using Neon? Drop `&channel_binding=require` from the connection string — `pg` doesn't support it.
@@ -75,6 +88,7 @@ Push to GitHub, add these secrets under **Settings → Secrets and variables →
 | `TARGET_GITHUB_USERNAME` | your GitHub username |
 | `TELEGRAM_BOT_TOKEN` | from @BotFather |
 | `TELEGRAM_CHAT_ID` | from @userinfobot |
+| `TAVILY_API_KEY` | from app.tavily.com (free tier works) |
 | `LANGSMITH_API_KEY` | optional |
 
 ![GitHub Actions secrets](/src/assets/images/github-actions-secrets.png)
@@ -91,6 +105,7 @@ Trigger manually: **Actions tab → select workflow → Run workflow**. The Dail
 | `pnpm cleanup` | Stale data deletion only — alias for `--job=cleanup` |
 | `pnpm start` | GitHub fetch + manual KPI input + diary report — alias for `--job=daily-kpi` |
 | `pnpm news` | Scrape, curate, send via Telegram — alias for `--job=news` |
+| `pnpm ai-news` | Tavily AI news search, dedupe, send via Telegram — alias for `--job=ai-news` |
 | `pnpm jobs` | List every registered job with its cron schedule |
 | `pnpm run dev --job=<name>` | Run any registered job by name |
 | `pnpm seed-mock` | Seed expired mock users into company DB |

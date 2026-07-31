@@ -1,0 +1,38 @@
+name: Daily AI News
+
+on:
+  schedule:
+    # 10:30 PM UTC = 8:30 AM AEST (UTC+10, Apr-Oct) — 30 min after the trending digest
+    # Note: during AEDT (Oct-Apr, UTC+11) this fires at 9:30 AM Sydney time
+    - cron: '30 22 * * *'
+  workflow_dispatch: # allows manual trigger from GitHub UI
+
+jobs:
+  ai-news:
+    name: Search and send AI news digest
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.actor == 'DamengRandom'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        run: pnpm install
+
+      # No LLM_API_KEY — this pipeline never calls a model.
+      - name: Run AI news agent
+        env:
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          DATABASE_URL: ${{ secrets.NEON_WORK_COORDINATOR_DB_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: pnpm ai-news

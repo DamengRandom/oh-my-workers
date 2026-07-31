@@ -78,6 +78,21 @@ export const TrendingRepoLogSchema = TrendingRepoOutputSchema.extend({
   updated_at: z.string(),
 })
 
+// --- AI news digest (Tavily) ---
+export const AiNewsItemSchema = z.object({
+  title: z.string(),
+  url: z.string(),
+  source: z.string(), // hostname, e.g. "reuters.com"
+  snippet: z.string(), // Tavily's article excerpt, truncated
+  published_date: z.string().nullable(), // ISO — Tavily omits it on some results
+})
+
+export const AiNewsLogSchema = AiNewsItemSchema.extend({
+  sent: z.boolean(),
+  created_at: z.string(),
+  updated_at: z.string(),
+})
+
 // TypeScript types inferred from schemas
 export interface TrendingRepo {
   name: string // e.g. "owner/repo"
@@ -97,5 +112,7 @@ export type CleanupResult = z.infer<typeof CleanupResultSchema>
 export type TrendingRepoLog = z.infer<typeof TrendingRepoLogSchema>
 
 export type CuratedRepo = z.infer<typeof TrendingRepoOutputSchema>
+export type AiNewsItem = z.infer<typeof AiNewsItemSchema>
+export type AiNewsLog = z.infer<typeof AiNewsLogSchema>
 
 export type AgentResult = { messages: Array<{ _getType?: () => string; content: unknown }> }
