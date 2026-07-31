@@ -2,8 +2,8 @@ import { cleanupAgent } from './cleanup.agent.js'
 import { githubAgent } from './github.agent.js'
 import { manualKpiAgent } from './manual-kpi.agent.js'
 import { diaryAgent } from './diary.agent.js'
-import { trendingCuratorAgent } from './news-curator.agent.js'
-import { trendingTelegramAgent } from './news-telegram.agent.js'
+import { curateTrending } from './news-curator.agent.js'
+import { trendingTelegramTool } from '../tools/news-telegram.tool.js'
 import { trendingScrapeTool } from '../tools/trending-scrape.tool.js'
 import { saveKpiRecord, saveTrendingRepos, getRecentRepoNames } from '../storage/own-db.js'
 import { sectionLogger } from '../utils/logger.js'
@@ -202,15 +202,11 @@ export class WorkCoordinator {
     console.log('⚡️ Curating top repos...\n')
 
     const content = feedback
-      ? `Curate the top trending GitHub repos from these results. Pick the top 5-8 most interesting ones:\n\n${JSON.stringify(newRepos)}\n\nYour previous response could not be parsed (${feedback}). Return valid JSON only, matching the curate_trending_repos tool schema exactly.`
+      ? `Curate the top trending GitHub repos from these results. Pick the top 5-8 most interesting ones:\n\n${JSON.stringify(newRepos)}\n\nYour previous response could not be parsed (${feedback}). Return output matching the required schema exactly.`
       : `Curate the top trending GitHub repos from these results. Pick the top 5-8 most interesting ones:\n\n${JSON.stringify(newRepos)}`
 
     try {
-      const curateResult = await trendingCuratorAgent.invoke({
-        messages: [{ role: 'user', content }],
-      })
-
-      return toolOutput(curateResult, 'curate_trending_repos')
+      return await curateTrending(content)
     } catch (err) {
       console.error('❌ Trending curation attempt failed:', err instanceof Error ? err.message : err)
 
@@ -223,18 +219,11 @@ export class WorkCoordinator {
     console.log('⚡️ Sending trending digest via Telegram...\n')
 
     try {
-      await trendingTelegramAgent.invoke({
-        messages: [
-          {
-            role: 'user',
-            content: `Send this GitHub trending digest via Telegram now.\n\n${JSON.stringify(repos)}`,
-          },
-        ],
-      })
+      await trendingTelegramTool.invoke({ repos })
       return true
     } catch (err) {
       console.error('❌ Telegram delivery failed:', err instanceof Error ? err.message : err)
-      await notifyError('Trending Telegram agent', err)
+      await notifyError('Trending Telegram delivery', err)
       return false
     }
   }

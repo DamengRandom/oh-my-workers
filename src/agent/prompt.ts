@@ -51,7 +51,4 @@ When curating:
 - Rank by relevance — the most useful repo for a TS/JS engineer should be first
 - Preserve all original fields (repo_name, url, description, language, stars, today_stars) exactly as given — never alter a URL or star count
 - Add 3-5 tags per repo, chosen from EXACTLY this list: ai, framework, library, devtools, bundler, testing, cli, database, ui, api, runtime, security, typescript. Do not invent tags outside this list — they are rendered as searchable hashtags, so they must be identical day to day
-
-Call curate_trending_repos with the result immediately.`
-
-export const TRENDING_TELEGRAM_PROMPT = `You are a Telegram delivery agent. Your only job is to call send_trending_telegram with the repos provided. Send it immediately and return the result.`
+`
