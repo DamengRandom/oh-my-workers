@@ -51,10 +51,6 @@ export async function initDb(): Promise<void> {
       updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
-    -- saveTrendingRepos upserts on this. Fails if the table already holds
-    -- duplicate repo_names — run scripts/dedupe-trending.ts first.
-    CREATE UNIQUE INDEX IF NOT EXISTS github_trending_repo_name_key ON github_trending (repo_name);
-
     CREATE TABLE IF NOT EXISTS ai_news (
       id             SERIAL PRIMARY KEY,
       title          TEXT NOT NULL,
@@ -66,9 +62,6 @@ export async function initDb(): Promise<void> {
       created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
-
-    -- The digest dedupes on url: a story already in this table is never sent twice.
-    CREATE UNIQUE INDEX IF NOT EXISTS ai_news_url_key ON ai_news (url);
   `)
 
   // The T15 AI news feature (removed in T20) left an ai_news table behind on any
@@ -90,6 +83,16 @@ export async function initDb(): Promise<void> {
     ALTER TABLE ai_news ADD COLUMN IF NOT EXISTS source         TEXT NOT NULL DEFAULT '';
     ALTER TABLE ai_news ADD COLUMN IF NOT EXISTS snippet        TEXT NOT NULL DEFAULT '';
     ALTER TABLE ai_news ADD COLUMN IF NOT EXISTS published_date TIMESTAMPTZ;
+  `)
+
+  await pool.query(`
+    DELETE FROM github_trending a USING github_trending b
+      WHERE a.id < b.id AND a.repo_name = b.repo_name;
+    CREATE UNIQUE INDEX IF NOT EXISTS github_trending_repo_name_key ON github_trending (repo_name);
+
+    DELETE FROM ai_news a USING ai_news b
+      WHERE a.id < b.id AND a.url = b.url;
+    CREATE UNIQUE INDEX IF NOT EXISTS ai_news_url_key ON ai_news (url);
   `)
   logger.info('✅ Own database tables ready')
 }
@@ -177,7 +180,7 @@ export async function saveAiNews(items: AiNewsLog[]): Promise<void> {
 export async function findSeenUrls(urls: string[]): Promise<Set<string>> {
   if (!urls.length) return new Set()
 
-  const { rows } = await pool.query<{ url: string }>(`SELECT url FROM ai_news WHERE url = ANY($1)`, [urls])
+  const { rows } = await pool.query<{ url: string }>(`SELECT url FROM ai_news WHERE url = ANY($1) AND sent = true`, [urls])
 
   return new Set(rows.map((r) => r.url))
 }

@@ -28,7 +28,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      # No LLM_API_KEY — this pipeline never calls a model.
       - name: Run AI news agent
         env:
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}

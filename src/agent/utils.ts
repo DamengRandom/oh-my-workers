@@ -1,10 +1,8 @@
 import { logger } from '../utils/logger.js'
 import { AgentResult } from '../schemas/index.ts'
 
-// Telegram's HTML parse_mode rejects the whole message on a stray angle bracket,
-// so every piece of scraped or fetched text goes through this before it is sent.
 export function escapeHtml(text: string): string {
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
 // Ellipsis included in the budget, so the result is never longer than max.
