@@ -1,8 +1,8 @@
-import { cleanupAgent } from './cleanup.agent.js'
 import { githubAgent } from './github.agent.js'
-import { manualKpiAgent } from './manual-kpi.agent.js'
 import { diaryAgent } from './diary.agent.js'
 import { curateTrending } from './news-curator.agent.js'
+import { cleanupTool } from '../tools/cleanup.tool.js'
+import { manualKpiTool } from '../tools/manual-kpi.tool.js'
 import { trendingTelegramTool } from '../tools/news-telegram.tool.js'
 import { trendingScrapeTool } from '../tools/trending-scrape.tool.js'
 import { saveKpiRecord, saveTrendingRepos } from '../storage/own-db.js'
@@ -13,21 +13,18 @@ import { runCuratorGraph } from './curator.graph.ts'
 import { TRENDING_TOP_N } from '../constants/index.js'
 
 export class WorkCoordinator {
-  // ── Automated (crontab) — no human input required ─────────────────────────
-
+  // Deprecated SOON - because this is just for demo only
   static async runCleanup(): Promise<void> {
     const today = new Date().toISOString().split('T')[0]
 
     sectionLogger(`🧹 Oh My Workers — Cleanup — ${today}`)
 
     try {
-      await cleanupAgent.invoke({
-        messages: [{ role: 'user', content: 'Run the stale data cleanup now.' }],
-      })
+      await cleanupTool.invoke({})
       sectionLogger(`✅ Cleanup complete for ${today}`)
     } catch (err) {
-      console.error('❌ Cleanup agent failed:', err instanceof Error ? err.message : err)
-      await notifyError('Cleanup agent', err)
+      console.error('❌ Cleanup failed:', err instanceof Error ? err.message : err)
+      await notifyError('Cleanup', err)
     }
   }
 
@@ -35,27 +32,20 @@ export class WorkCoordinator {
 
   // Phase 2: ask the engineer for manual activities. Failures are non-critical,
   // so this swallows errors and returns an empty activity list.
-  private static async collectManualActivities(): Promise<{ manualResult: AgentResult | null; activities: string[] }> {
-    let manualResult: AgentResult | null = null
+  private static async collectManualActivities(): Promise<{ manualOutput: string; activities: string[] }> {
+    let manualOutput = ''
 
     try {
-      manualResult = await manualKpiAgent.invoke({
-        messages: [{ role: 'user', content: 'Ask the engineer what else they did today.' }],
-      })
+      manualOutput = await manualKpiTool.invoke({})
     } catch (err) {
-      console.error('❌ Manual KPI agent failed:', err instanceof Error ? err.message : err)
-      await notifyError('Manual KPI agent', err)
+      console.error('❌ Manual KPI input failed:', err instanceof Error ? err.message : err)
+      await notifyError('Manual KPI input', err)
       // non-critical — continue with GitHub data only
     }
 
-    let activities: string[] = []
+    const parsed = parseJson<{ activities?: string[] }>(manualOutput, {})
 
-    if (manualResult) {
-      const parsed = parseJson<{ activities?: string[] }>(toolOutput(manualResult, 'collect_manual_kpi_input'), {})
-      activities = parsed.activities ?? []
-    }
-
-    return { manualResult, activities }
+    return { manualOutput, activities: parsed.activities ?? [] }
   }
 
   // Phase 3a: no manual activities — persist a GitHub-only KPI record.
@@ -84,8 +74,8 @@ export class WorkCoordinator {
     }
   }
 
-  // Phase 3b: manual activities present — generate and save the full KPI report.
-  private static async generateDiaryReport(githubResult: AgentResult, manualResult: AgentResult | null, activityCount: number): Promise<void> {
+  // Phase 4: manual activities present — generate and save the full KPI report.
+  private static async generateDiaryReport(githubResult: AgentResult, manualOutput: string, activityCount: number): Promise<void> {
     console.log(`\n⚡️ Phase 3: Generating daily KPI report (${activityCount} manual activities recorded)...\n`)
 
     try {
@@ -93,7 +83,7 @@ export class WorkCoordinator {
         messages: [
           {
             role: 'user',
-            content: `Write and save today's KPI report using the data below.\n\nGitHub activity:\n${toolOutput(githubResult, 'fetch_github_activity')}\n\nManual activities:\n${manualResult ? toolOutput(manualResult, 'collect_manual_kpi_input') : ''}`,
+            content: `Write and save today's KPI report using the data below.\n\nGitHub activity:\n${toolOutput(githubResult, 'fetch_github_activity')}\n\nManual activities:\n${manualOutput}`,
           },
         ],
       })
@@ -123,19 +113,16 @@ export class WorkCoordinator {
     console.log('⚡️ Phase 1: Running cleanup and GitHub fetch in parallel...\n')
 
     const [cleanupSettled, githubSettled] = await Promise.allSettled([
-      cleanupAgent.invoke({
-        messages: [{ role: 'user', content: 'Run the stale data cleanup now.' }],
-      }),
+      cleanupTool.invoke({}),
       githubAgent.invoke({
         messages: [{ role: 'user', content: `Fetch GitHub activity for username "${username}" on date "${today}".` }],
       }),
     ])
 
     if (cleanupSettled.status === 'rejected') {
-      console.error('❌ Cleanup agent failed:', cleanupSettled.reason)
+      console.error('❌ Cleanup failed:', cleanupSettled.reason)
 
-      await notifyError('Cleanup agent (daily jobs)', cleanupSettled.reason)
-      // non-critical — continue with GitHub + diary
+      await notifyError('Cleanup (daily jobs)', cleanupSettled.reason)
     }
 
     if (githubSettled.status === 'rejected') {
@@ -151,13 +138,13 @@ export class WorkCoordinator {
     // ── Phase 2: Manual input (interactive, sequential) ──────────────────────
     console.log('\n⚡️ Phase 2: Collecting manual activities...')
 
-    const { manualResult, activities } = await WorkCoordinator.collectManualActivities()
+    const { manualOutput, activities } = await WorkCoordinator.collectManualActivities()
 
     // ── Phase 3: Conditional — diary only if manual input was provided ────────
     if (activities.length === 0) {
       await WorkCoordinator.saveGithubOnlyKpi(githubResult, now)
     } else {
-      await WorkCoordinator.generateDiaryReport(githubResult, manualResult, activities.length)
+      await WorkCoordinator.generateDiaryReport(githubResult, manualOutput, activities.length)
     }
 
     sectionLogger(`✅ All jobs complete for ${today}`)

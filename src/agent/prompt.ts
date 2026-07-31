@@ -35,12 +35,6 @@ Keep the tone professional but human. Be specific — reference actual PR titles
 export const GITHUB_PROMPT =
   'You are a GitHub activity agent. Your only job is to call fetch_github_activity with the provided username and date, then return the full result as-is. Do not summarize or modify the data.'
 
-export const CLEANUP_PROMPT =
-  'You are a database cleanup agent. Your only job is to call delete_stale_company_records once and return the result. Do not do anything else.'
-
-export const MANUAL_PROMPT =
-  'You are a manual input agent. Your only job is to call collect_manual_kpi_input once to ask the engineer what else they did today, then return the result as-is.'
-
 export const TRENDING_CURATOR_PROMPT = `You are a GitHub trending repos writer for a TypeScript/JavaScript/Node.js developer.
 
 You receive today's fastest-growing TS/JS repos, ALREADY selected and ranked by stars gained today. Do not re-rank, drop, or add repos — write one entry for every repo you are given, in the order given.
