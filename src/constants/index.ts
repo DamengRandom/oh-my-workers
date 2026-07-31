@@ -7,6 +7,30 @@ export const LLM_FALLBACK_MODELS = ['nvidia/nemotron-3-super-120b-a12b:free', 'g
 export const TRENDING_TOP_N = 8
 export const COMPANY_CLEANUP_TABLE = 'mockTestUsers'
 export const COMPANY_CLEANUP_THRESHOLD_DAYS = '30'
+// ── AI news digest (Tavily) ──────────────────────────────────────────────────
+// How many stories make the digest.
+export const AI_NEWS_TOP_N = 4
+// Over-fetch: dedupe drops stories already sent, so asking for exactly 4 would
+// deliver fewer than 4 on any day with repeats.
+export const AI_NEWS_FETCH_N = 10
+export const AI_NEWS_LOOKBACK_DAYS = 1
+export const AI_NEWS_SNIPPET_MAX = 200
+// Tavily's `score` is relevance to this query, not popularity — a vague query
+// like "artificial intelligence" scores wellness blogs above model launches.
+// Digest quality lives here and in AI_NEWS_DOMAINS, not in the ranking.
+export const AI_NEWS_QUERY = 'major AI model releases, funding, and industry announcements'
+export const AI_NEWS_DOMAINS = [
+  'techcrunch.com',
+  'theverge.com',
+  'arstechnica.com',
+  'venturebeat.com',
+  'wired.com',
+  'reuters.com',
+  'bloomberg.com',
+  'theinformation.com',
+]
+
 export const DEFAULT_CRONJOB_TIME = '0 17 * * *'
 export const DEFAULT_CRONJOB_TIMEZONE = 'Australia/Sydney' // Change to Your local time zone when you need to use this constant value
 export const NEWS_CRON_TIME = '0 22 * * *' // 8:00 AM AEST (UTC+10) / 9:00 AM AEDT (UTC+11, Oct-Apr)
+export const AI_NEWS_CRON_TIME = '30 22 * * *' // 8:30 AM AEST — 30 min after the trending digest

@@ -1,5 +1,5 @@
-import { runDailyJobs, runCleanup, runNewsAgent } from '../agent/index.js'
-import { DEFAULT_CRONJOB_TIME, DEFAULT_CRONJOB_TIMEZONE, NEWS_CRON_TIME } from '../constants/index.js'
+import { runDailyJobs, runCleanup, runNewsAgent, runAiNewsAgent } from '../agent/index.js'
+import { AI_NEWS_CRON_TIME, DEFAULT_CRONJOB_TIME, DEFAULT_CRONJOB_TIMEZONE, NEWS_CRON_TIME } from '../constants/index.js'
 
 /**
  * A Job is a single unit of scheduled work.
@@ -39,6 +39,13 @@ export const jobs: Job[] = [
     schedule: NEWS_CRON_TIME,
     timezone: DEFAULT_CRONJOB_TIMEZONE,
     run: runNewsAgent,
+  },
+  {
+    name: 'ai-news',
+    description: 'AI news search via Tavily, dedupe, and Telegram delivery',
+    schedule: AI_NEWS_CRON_TIME,
+    timezone: DEFAULT_CRONJOB_TIMEZONE,
+    run: runAiNewsAgent,
   },
 ]
 

@@ -5,13 +5,15 @@ import { cleanupTool } from '../tools/cleanup.tool.js'
 import { manualKpiTool } from '../tools/manual-kpi.tool.js'
 import { trendingTelegramTool } from '../tools/news-telegram.tool.js'
 import { trendingScrapeTool } from '../tools/trending-scrape.tool.js'
-import { saveKpiRecord, saveTrendingRepos } from '../storage/own-db.js'
+import { aiNewsSearchTool, selectUnseen } from '../tools/ai-news-search.tool.js'
+import { aiNewsTelegramTool } from '../tools/ai-news-telegram.tool.js'
+import { saveKpiRecord, saveTrendingRepos, saveAiNews, findSeenUrls } from '../storage/own-db.js'
 import { sectionLogger, logger } from '../utils/logger.js'
 import { notifyError, parseJson, toolOutput } from './utils.ts'
-import { AgentResult, CuratedRepo, TrendingRepo } from '../schemas/index.ts'
+import { AgentResult, AiNewsItem, CuratedRepo, TrendingRepo } from '../schemas/index.ts'
 import { runCuratorGraph } from './curator.graph.ts'
 import { toKpiRecord } from './kpi-record.ts'
-import { TRENDING_TOP_N } from '../constants/index.js'
+import { AI_NEWS_TOP_N, TRENDING_TOP_N } from '../constants/index.js'
 
 export class WorkCoordinator {
   // Deprecated SOON - because this is just for demo only
@@ -221,6 +223,103 @@ export class WorkCoordinator {
     }
   }
 
+  // ── AI news digest: helpers ────────────────────────────────────────────────
+
+  // Step 1: search Tavily. Returns null on failure (already notified).
+  private static async searchAiNews(): Promise<AiNewsItem[] | null> {
+    logger.info('⚡️ Searching AI news via Tavily...')
+
+    try {
+      const raw = await aiNewsSearchTool.invoke({})
+
+      return JSON.parse(raw) as AiNewsItem[]
+    } catch (err) {
+      logger.error({ err }, '❌ AI news search failed')
+
+      await notifyError('AI news search', err)
+
+      return null
+    }
+  }
+
+  // Step 2: drop stories already sent, keep Tavily's order, take the top N.
+  // A DB failure here is not fatal — better a possible repeat than no digest.
+  private static async pickFreshStories(items: AiNewsItem[]): Promise<AiNewsItem[]> {
+    let seen = new Set<string>()
+
+    try {
+      seen = await findSeenUrls(items.map((i) => i.url))
+    } catch (err) {
+      logger.error({ err }, '⚠️ Could not check for already-sent stories — continuing without dedupe')
+    }
+
+    const fresh = selectUnseen(items, seen, AI_NEWS_TOP_N)
+
+    logger.info(`📰 ${fresh.length} fresh stories (${seen.size} of ${items.length} already sent)`)
+
+    return fresh
+  }
+
+  // Step 3: deliver the digest via Telegram. Returns whether the send succeeded.
+  private static async sendAiNewsTelegram(items: AiNewsItem[]): Promise<boolean> {
+    logger.info('⚡️ Sending AI news digest via Telegram...')
+
+    try {
+      await aiNewsTelegramTool.invoke({ items })
+      return true
+    } catch (err) {
+      logger.error({ err }, '❌ AI news Telegram delivery failed')
+      await notifyError('AI news Telegram delivery', err)
+      return false
+    }
+  }
+
+  // Step 4: persist the stories, tagging whether delivery succeeded. Saved even
+  // on a failed send, so a Telegram outage does not silently lose the digest.
+  private static async saveAiNewsItems(items: AiNewsItem[], sent: boolean, now: string): Promise<void> {
+    try {
+      await saveAiNews(items.map((item) => ({ ...item, sent, created_at: now, updated_at: now })))
+      logger.info(`✅ Saved ${items.length} AI news stories to database.`)
+    } catch (err) {
+      logger.error({ err }, '❌ Failed to save AI news stories')
+      await notifyError('saveAiNews', err)
+    }
+  }
+
+  // ── Daily AI news — search, dedupe, send via Telegram ─────────────────────
+
+  static async runAiNewsAgent(): Promise<void> {
+    const today = new Date().toISOString().split('T')[0]
+    const now = new Date().toISOString()
+
+    sectionLogger(`🤖 Oh My Workers — AI News — ${today}`)
+
+    // ── Step 1: Search Tavily ───────────────────────────────────────────────
+    const results = await WorkCoordinator.searchAiNews()
+    if (!results) return
+
+    if (!results.length) {
+      logger.info('⏭️ No AI news found — skipping.')
+      return
+    }
+
+    // ── Step 2: Drop already-sent stories, keep the top N ───────────────────
+    const fresh = await WorkCoordinator.pickFreshStories(results)
+
+    if (!fresh.length) {
+      logger.info('⏭️ Every story was already sent — skipping send and save.')
+      return
+    }
+
+    // ── Step 3: Send via Telegram ───────────────────────────────────────────
+    const sent = await WorkCoordinator.sendAiNewsTelegram(fresh)
+
+    // ── Step 4: Save to DB ──────────────────────────────────────────────────
+    await WorkCoordinator.saveAiNewsItems(fresh, sent, now)
+
+    sectionLogger(`✅ AI News job complete for ${today}`)
+  }
+
   // ── Daily GitHub Trending — scrape, dedup, curate, send via Telegram ─────
 
   static async runNewsAgent(): Promise<void> {
@@ -268,4 +367,4 @@ export class WorkCoordinator {
 }
 
 // ── Named exports for backwards compatibility with index.ts and registry.ts ───
-export const { runCleanup, runDailyJobs, runNewsAgent } = WorkCoordinator
+export const { runCleanup, runDailyJobs, runNewsAgent, runAiNewsAgent } = WorkCoordinator

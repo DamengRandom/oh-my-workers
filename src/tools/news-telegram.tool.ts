@@ -1,10 +1,7 @@
 import { logger } from '../utils/logger.js'
 import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
-
-function escapeHtml(text: string): string {
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
+import { escapeHtml } from '../agent/utils.js'
 
 export const trendingTelegramTool = new DynamicStructuredTool({
   name: 'send_trending_telegram',
