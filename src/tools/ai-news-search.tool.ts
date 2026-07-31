@@ -2,6 +2,7 @@ import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
 import { logger } from '../utils/logger.js'
 import { AI_NEWS_DOMAINS, AI_NEWS_FETCH_N, AI_NEWS_LOOKBACK_DAYS, AI_NEWS_QUERY, AI_NEWS_SNIPPET_MAX } from '../constants/index.js'
+import { truncate } from '../agent/utils.js'
 import type { AiNewsItem } from '../schemas/index.js'
 
 const TAVILY_SEARCH_URL = 'https://api.tavily.com/search'
@@ -34,6 +35,29 @@ function toIsoDate(raw: string | null | undefined): string | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
 }
 
+// The HTTP half: credentials, the call, and the error surface. Throws rather
+// than returning empty, so a dead key or a rate limit reaches notifyError
+// instead of looking like a quiet news day.
+async function searchTavily(body: Record<string, unknown>): Promise<TavilyResult[]> {
+  const apiKey = process.env.TAVILY_API_KEY ?? ''
+
+  if (!apiKey) throw new Error('TAVILY_API_KEY is not set in environment variables')
+
+  const response = await fetch(TAVILY_SEARCH_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Tavily API error ${response.status}: ${await response.text()}`)
+  }
+
+  const data = (await response.json()) as { results?: TavilyResult[] }
+
+  return data.results ?? []
+}
+
 // Exported for testing, and because the digest's whole selection policy is these
 // three lines: drop what was already sent, keep Tavily's order, take the top N.
 // Tavily's `score` is relevance to the query, not popularity — sorting by it
@@ -43,19 +67,23 @@ export function selectUnseen(items: AiNewsItem[], seenUrls: Set<string>, topN: n
   return items.filter((item) => !seenUrls.has(item.url)).slice(0, topN)
 }
 
+// Tavily sometimes returns a blank or padded title; the url is the last resort
+// so a story is never listed with no name at all.
+function titleOf(r: TavilyResult): string {
+  return r.title?.trim() || String(r.url)
+}
+
 export function toAiNewsItems(results: TavilyResult[]): AiNewsItem[] {
   return results.flatMap((r) => {
     // A result with no URL cannot be deduped, stored, or linked — drop it.
     if (!r.url) return []
 
-    const snippet = r.content ?? ''
-
     return [
       {
-        title: r.title?.trim() || r.url,
+        title: titleOf(r),
         url: r.url,
         source: hostnameOf(r.url),
-        snippet: snippet.length > AI_NEWS_SNIPPET_MAX ? `${snippet.slice(0, AI_NEWS_SNIPPET_MAX - 1).trimEnd()}…` : snippet,
+        snippet: truncate(r.content ?? '', AI_NEWS_SNIPPET_MAX),
         published_date: toIsoDate(r.published_date),
       },
     ]
@@ -72,30 +100,16 @@ export const aiNewsSearchTool = new DynamicStructuredTool({
     domains: z.array(z.string()).default(AI_NEWS_DOMAINS).describe('Restrict results to these news outlets'),
   }),
   func: async ({ query, days, maxResults, domains }) => {
-    const apiKey = process.env.TAVILY_API_KEY ?? ''
-
-    if (!apiKey) throw new Error('TAVILY_API_KEY is not set in environment variables')
-
-    const response = await fetch(TAVILY_SEARCH_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        query,
-        topic: 'news',
-        days,
-        max_results: maxResults,
-        search_depth: 'advanced',
-        include_domains: domains,
-      }),
+    const results = await searchTavily({
+      query,
+      topic: 'news',
+      days,
+      max_results: maxResults,
+      search_depth: 'advanced',
+      include_domains: domains,
     })
 
-    if (!response.ok) {
-      const body = await response.text()
-      throw new Error(`Tavily API error ${response.status}: ${body}`)
-    }
-
-    const data = (await response.json()) as { results?: TavilyResult[] }
-    const items = toAiNewsItems(data.results ?? [])
+    const items = toAiNewsItems(results)
 
     logger.info(`🔍 Tavily returned ${items.length} AI news results from the last ${days} day(s)`)
 

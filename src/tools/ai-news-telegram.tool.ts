@@ -1,6 +1,6 @@
 import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
-import { escapeHtml } from '../agent/utils.js'
+import { escapeHtml, truncate } from '../agent/utils.js'
 import { sendTelegramMessage } from './telegram.js'
 import { AI_NEWS_SNIPPET_MAX } from '../constants/index.js'
 import type { AiNewsItem } from '../schemas/index.js'
@@ -15,25 +15,27 @@ const NUMBER_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6
 
 // Exported for testing: all the formatting decisions live here, so the tool's
 // own func stays a plain HTTP call.
+function storyEntry(item: AiNewsItem, index: number): string {
+  const num = NUMBER_EMOJIS[index] ?? `${index + 1}.`
+  // The search tool already truncates, but Telegram hard-fails the whole
+  // message past 4096 chars — so the bound is re-asserted where the message
+  // is built, same as the trending digest.
+  const snippet = truncate(item.snippet, AI_NEWS_SNIPPET_MAX)
+  const published = item.published_date?.split('T')[0] ?? 'recent'
+
+  const lines = [`${num} <b>${escapeHtml(item.title)}</b>`, `📰 ${escapeHtml(item.source)} · ${escapeHtml(published)}`]
+
+  // Tavily occasionally returns an empty excerpt — skip the line rather than
+  // leaving a blank one in the digest.
+  if (snippet) lines.push(`<i>${escapeHtml(snippet)}</i>`)
+
+  lines.push(`🔗 <a href="${escapeHtml(item.url)}">Read more</a>`)
+
+  return lines.join('\n')
+}
+
 export function buildAiNewsMessage(items: AiNewsItem[], today: string): string {
-  const storyLines = items.map((item, i) => {
-    const num = NUMBER_EMOJIS[i] ?? `${i + 1}.`
-    // The search tool already truncates, but Telegram hard-fails the whole
-    // message past 4096 chars — so the bound is re-asserted where the message
-    // is built, same as the trending digest.
-    const snippet = item.snippet.length > AI_NEWS_SNIPPET_MAX ? `${item.snippet.slice(0, AI_NEWS_SNIPPET_MAX - 1)}…` : item.snippet
-    const published = item.published_date?.split('T')[0] ?? 'recent'
-
-    const lines = [`${num} <b>${escapeHtml(item.title)}</b>`, `📰 ${escapeHtml(item.source)} · ${escapeHtml(published)}`]
-
-    // Tavily occasionally returns an empty excerpt — skip the line rather than
-    // leaving a blank one in the digest.
-    if (snippet) lines.push(`<i>${escapeHtml(snippet)}</i>`)
-
-    lines.push(`🔗 <a href="${escapeHtml(item.url)}">Read more</a>`)
-
-    return lines.join('\n')
-  })
+  const storyLines = items.map(storyEntry)
 
   return [
     `🧠 <b>AI News — Daily Digest</b>`,

@@ -7,6 +7,11 @@ export function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+// Ellipsis included in the budget, so the result is never longer than max.
+export function truncate(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text
+}
+
 export function toolOutput(result: AgentResult, toolName: string): string {
   const msg = result.messages.find((m) => m._getType?.() === 'tool' && (m as { name?: string }).name === toolName)
   if (!msg) return ''
