@@ -2,14 +2,15 @@ import { cleanupAgent } from './cleanup.agent.js'
 import { githubAgent } from './github.agent.js'
 import { manualKpiAgent } from './manual-kpi.agent.js'
 import { diaryAgent } from './diary.agent.js'
-import { trendingCuratorAgent } from './news-curator.agent.js'
-import { trendingTelegramAgent } from './news-telegram.agent.js'
+import { curateTrending } from './news-curator.agent.js'
+import { trendingTelegramTool } from '../tools/news-telegram.tool.js'
 import { trendingScrapeTool } from '../tools/trending-scrape.tool.js'
-import { saveKpiRecord, saveTrendingRepos, getRecentRepoNames } from '../storage/own-db.js'
+import { saveKpiRecord, saveTrendingRepos } from '../storage/own-db.js'
 import { sectionLogger } from '../utils/logger.js'
 import { notifyError, parseJson, toolOutput } from './utils.ts'
 import { AgentResult, CuratedRepo, TrendingRepo } from '../schemas/index.ts'
 import { runCuratorGraph } from './curator.graph.ts'
+import { TRENDING_TOP_N } from '../constants/index.js'
 
 export class WorkCoordinator {
   // ── Automated (crontab) — no human input required ─────────────────────────
@@ -181,36 +182,23 @@ export class WorkCoordinator {
     }
   }
 
-  // Step 2: drop repos seen in the last 7 days. Falls back to all repos on error.
-  private static async dedupRepos(allRepos: TrendingRepo[]): Promise<TrendingRepo[]> {
-    console.log('⚡️ Deduplicating against recent repos...\n')
+  // Step 2: rank by stars gained today and keep the top N. Selection is a sort,
+  // not a judgement call — the model never sees the repos that lost.
+  private static rankByGrowth(newRepos: TrendingRepo[]): TrendingRepo[] {
+    const top = [...newRepos].sort((a, b) => b.todayStars - a.todayStars).slice(0, TRENDING_TOP_N)
 
-    try {
-      const recentNames = await getRecentRepoNames(7)
-      const newRepos = allRepos.filter((r) => !recentNames.has(r.name))
-      console.log(`📊 ${allRepos.length} scraped, ${allRepos.length - newRepos.length} duplicates removed, ${newRepos.length} new`)
-      return newRepos
-    } catch (err) {
-      console.error('⚠️ Dedup query failed, proceeding with all repos:', err instanceof Error ? err.message : err)
-      return allRepos
-    }
+    console.log(`📈 Top ${top.length} by stars gained today: ${top[0]?.todayStars ?? 0} down to ${top.at(-1)?.todayStars ?? 0}`)
+
+    return top
   }
 
-  // Step 3: curate + summarize via LLM. One attempt — retries and final
+  // Step 3: write summaries for the ranked repos. One attempt — retries and final
   // failure notification are handled by runCuratorGraph / runNewsAgent.
   private static async curateRepos(newRepos: TrendingRepo[], feedback?: string): Promise<string> {
-    console.log('⚡️ Curating top repos...\n')
-
-    const content = feedback
-      ? `Curate the top trending GitHub repos from these results. Pick the top 5-8 most interesting ones:\n\n${JSON.stringify(newRepos)}\n\nYour previous response could not be parsed (${feedback}). Return valid JSON only, matching the curate_trending_repos tool schema exactly.`
-      : `Curate the top trending GitHub repos from these results. Pick the top 5-8 most interesting ones:\n\n${JSON.stringify(newRepos)}`
+    console.log('⚡️ Writing digest summaries...\n')
 
     try {
-      const curateResult = await trendingCuratorAgent.invoke({
-        messages: [{ role: 'user', content }],
-      })
-
-      return toolOutput(curateResult, 'curate_trending_repos')
+      return await curateTrending(newRepos, feedback)
     } catch (err) {
       console.error('❌ Trending curation attempt failed:', err instanceof Error ? err.message : err)
 
@@ -223,18 +211,11 @@ export class WorkCoordinator {
     console.log('⚡️ Sending trending digest via Telegram...\n')
 
     try {
-      await trendingTelegramAgent.invoke({
-        messages: [
-          {
-            role: 'user',
-            content: `Send this GitHub trending digest via Telegram now.\n\n${JSON.stringify(repos)}`,
-          },
-        ],
-      })
+      await trendingTelegramTool.invoke({ repos })
       return true
     } catch (err) {
       console.error('❌ Telegram delivery failed:', err instanceof Error ? err.message : err)
-      await notifyError('Trending Telegram agent', err)
+      await notifyError('Trending Telegram delivery', err)
       return false
     }
   }
@@ -281,16 +262,11 @@ export class WorkCoordinator {
       return
     }
 
-    // ── Step 2: Dedup against recent DB entries ─────────────────────────────
-    const newRepos = await WorkCoordinator.dedupRepos(allRepos)
+    // ── Step 2: Rank by stars gained today, keep the top N ──────────────────
+    const topRepos = WorkCoordinator.rankByGrowth(allRepos)
 
-    if (!newRepos.length) {
-      console.log('⏭️ All repos already sent recently — skipping.\n')
-      return
-    }
-
-    // ── Step 3: Curate and summarize via LLM ────────────────────────────────
-    const { curated, error } = await runCuratorGraph(newRepos, WorkCoordinator.curateRepos)
+    // ── Step 3: Write summaries via LLM ─────────────────────────────────────
+    const { curated, error } = await runCuratorGraph(topRepos, WorkCoordinator.curateRepos)
 
     if (!curated) {
       console.error('❌ Trending curation failed after retries:', error)
