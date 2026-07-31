@@ -10,6 +10,7 @@ import { sectionLogger, logger } from '../utils/logger.js'
 import { notifyError, parseJson, toolOutput } from './utils.ts'
 import { AgentResult, CuratedRepo, TrendingRepo } from '../schemas/index.ts'
 import { runCuratorGraph } from './curator.graph.ts'
+import { toKpiRecord } from './kpi-record.ts'
 import { TRENDING_TOP_N } from '../constants/index.js'
 
 export class WorkCoordinator {
@@ -52,20 +53,8 @@ export class WorkCoordinator {
   private static async saveGithubOnlyKpi(githubResult: AgentResult, now: string): Promise<void> {
     logger.info('⏭️ No manual activities provided — skipping diary, saving GitHub KPI only.')
 
-    const githubData = parseJson<{ summary?: string; commits?: unknown[]; pullRequests?: unknown[] }>(
-      toolOutput(githubResult, 'fetch_github_activity'),
-      {}
-    )
-
     try {
-      await saveKpiRecord({
-        github_summary: githubData.summary ?? '',
-        commits_count: (githubData.commits as unknown[])?.length ?? 0,
-        prs_count: (githubData.pullRequests as unknown[])?.length ?? 0,
-        activities: [],
-        created_at: now,
-        updated_at: now,
-      })
+      await saveKpiRecord(toKpiRecord(toolOutput(githubResult, 'fetch_github_activity'), now))
       logger.info('✅ GitHub KPI record saved.')
     } catch (err) {
       logger.error({ err }, '❌ Failed to save KPI record')

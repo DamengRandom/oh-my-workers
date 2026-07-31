@@ -15,7 +15,8 @@
     "jobs": "pnpm run dev --list-jobs",
     "seed-mock": "node --loader ts-node/esm src/scripts/seed-mock-users.ts",
     "format": "prettier --write \"src/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\""
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "test:coverage": "c8 --reporter=json --reporter=text --src src --all node --import tsx --test \"src/**/*.test.ts\""
   },
   "keywords": [
     "oh-my-workers",
@@ -55,6 +56,7 @@
   "devDependencies": {
     "@types/node": "^25.5.0",
     "@types/pg": "^8.20.0",
+    "c8": "^12.0.0",
     "prettier": "^3.8.1",
     "ts-node": "^10.9.2",
     "tsx": "^4.23.1",
