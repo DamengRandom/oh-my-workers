@@ -178,9 +178,7 @@ export class WorkCoordinator {
     return curateTrending(newRepos, feedback)
   }
 
-  // Step 4: deliver the digest via Telegram. Returns the repo names that actually
-  // went out — the tool drops trailing repos when the digest is too long, and
-  // those were never delivered.
+  // Step 4: deliver the digest via Telegram. Returns the repo names that went out.
   private static async sendTelegram(repos: CuratedRepo[]): Promise<Set<string>> {
     logger.info('⚡️ Sending trending digest via Telegram...')
 
