@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildTrendingMessage } from './news-telegram.tool.ts'
+import { buildTrendingMessage, fitRepos } from './news-telegram.tool.ts'
 import { TELEGRAM_MAX_CHARS, TRENDING_SUMMARY_MAX, TRENDING_TAG_MAX, TRENDING_TAGS_MAX, TRENDING_TOP_N } from '../constants/index.ts'
 import type { CuratedRepo } from '../schemas/index.ts'
 
@@ -90,3 +90,31 @@ test('drops trailing repos rather than emitting a message Telegram will reject',
 
   assert.ok(message.length <= TELEGRAM_MAX_CHARS, `message was ${message.length} chars`)
 })
+
+// A dropped repo is never delivered, so the caller has to be able to tell which
+// ones went out — otherwise they get recorded as sent.
+test('reports which repos survived the drop, not just the message', () => {
+  const bomb = Array.from({ length: TRENDING_TOP_N }, (_, i) =>
+    repo({ repo_name: `owner${i}/project-${i}`, summary: '&'.repeat(TRENDING_SUMMARY_MAX) })
+  )
+
+  const kept = fitRepos(bomb, '2026-08-01')
+
+  assert.ok(kept.length < bomb.length, 'this input must actually trigger the drop')
+  assert.equal(buildTrendingMessage(bomb, '2026-08-01'), assembleOf(kept))
+
+  // Every kept repo appears in the message; every dropped one does not.
+  const message = buildTrendingMessage(bomb, '2026-08-01')
+  const dropped = bomb.slice(kept.length)
+
+  for (const r of kept) assert.ok(message.includes(r.repo_name), `${r.repo_name} should be in the digest`)
+  for (const r of dropped) assert.ok(!message.includes(r.repo_name), `${r.repo_name} was dropped and must not appear`)
+})
+
+test('keeps every repo when the digest fits', () => {
+  const fits = [repo(), repo({ repo_name: 'vuejs/core' })]
+
+  assert.equal(fitRepos(fits, '2026-08-01').length, 2)
+})
+
+const assembleOf = (kept: CuratedRepo[]) => buildTrendingMessage(kept, '2026-08-01')

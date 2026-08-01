@@ -1,5 +1,6 @@
 import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
+import { logger } from '../utils/logger.js'
 import { escapeHtml, truncate } from '../agent/utils.js'
 import { sendTelegramMessage } from './telegram.js'
 import { TELEGRAM_MAX_CHARS, TRENDING_SUMMARY_MAX, TRENDING_TAG_MAX, TRENDING_TAGS_MAX } from '../constants/index.js'
@@ -42,12 +43,16 @@ function assemble(repos: CuratedRepo[], today: string): string {
   ].join('\n')
 }
 
-export function buildTrendingMessage(repos: CuratedRepo[], today: string): string {
+export function fitRepos(repos: CuratedRepo[], today: string): CuratedRepo[] {
   let kept = repos
 
   while (kept.length > 1 && assemble(kept, today).length > TELEGRAM_MAX_CHARS) kept = kept.slice(0, -1)
 
-  return assemble(kept, today)
+  return kept
+}
+
+export function buildTrendingMessage(repos: CuratedRepo[], today: string): string {
+  return assemble(fitRepos(repos, today), today)
 }
 
 export const trendingTelegramTool = new DynamicStructuredTool({
@@ -71,8 +76,19 @@ export const trendingTelegramTool = new DynamicStructuredTool({
   }),
   func: async ({ repos }) => {
     const today = new Date().toISOString().split('T')[0]
-    const chatId = await sendTelegramMessage(buildTrendingMessage(repos, today), 'Trending repos')
+    const kept = fitRepos(repos, today)
 
-    return JSON.stringify({ success: true, chat_id: chatId, date: today })
+    if (kept.length < repos.length) {
+      logger.warn(
+        `✂️ Digest too long for Telegram — dropped ${repos.length - kept.length} of ${repos.length} repos: ${repos
+          .slice(kept.length)
+          .map((r) => r.repo_name)
+          .join(', ')}`
+      )
+    }
+
+    const chatId = await sendTelegramMessage(assemble(kept, today), 'Trending repos')
+
+    return JSON.stringify({ success: true, chat_id: chatId, date: today, delivered: kept.map((r) => r.repo_name) })
   },
 })
