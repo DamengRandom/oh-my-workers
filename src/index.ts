@@ -33,6 +33,7 @@ async function main(): Promise<void> {
   const job = findJobByCliArg(process.argv)
 
   if (job) {
+    await initDb()
     await job.run()
 
     process.exit(0)
