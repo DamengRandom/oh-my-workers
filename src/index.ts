@@ -45,7 +45,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  logger.error('Fatal system error ⚠️❌⚠️❌: ', err)
+  logger.error({ err }, 'Fatal system error ⚠️❌⚠️❌')
 
   process.exit(1)
 })
