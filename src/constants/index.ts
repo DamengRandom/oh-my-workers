@@ -4,6 +4,7 @@ export const LLM_FALLBACK_MODELS = ['nvidia/nemotron-3-super-120b-a12b:free']
 // How many repos make the digest, ranked by stars gained today.
 export const TRENDING_TOP_N = 8
 export const TELEGRAM_MAX_CHARS = 4096
+export const LANGSMITH_URL = 'https://smith.langchain.com'
 export const TRENDING_SUMMARY_MAX = 140
 export const TRENDING_TAGS_MAX = 5
 export const TRENDING_TAG_MAX = 24
