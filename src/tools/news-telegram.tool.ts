@@ -1,7 +1,54 @@
 import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
-import { escapeHtml } from '../agent/utils.js'
+import { escapeHtml, truncate } from '../agent/utils.js'
 import { sendTelegramMessage } from './telegram.js'
+import { TELEGRAM_MAX_CHARS, TRENDING_SUMMARY_MAX, TRENDING_TAG_MAX, TRENDING_TAGS_MAX } from '../constants/index.js'
+import type { CuratedRepo } from '../schemas/index.js'
+
+const NUMBER_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣']
+
+function repoEntry(repo: CuratedRepo, index: number): string {
+  const num = NUMBER_EMOJIS[index] ?? `${index + 1}.`
+  const summary = truncate(repo.summary, TRENDING_SUMMARY_MAX)
+  const tags = repo.tags
+    .slice(0, TRENDING_TAGS_MAX)
+    .map((t) => `#${escapeHtml(truncate(t, TRENDING_TAG_MAX))}`)
+    .join(' ')
+
+  const lines = [
+    `${num} <b>${escapeHtml(repo.repo_name)}</b>`,
+    `⭐ ${repo.stars.toLocaleString()} (+${repo.today_stars} today) · ${escapeHtml(repo.language)}`,
+    `<i>${escapeHtml(summary)}</i>`,
+  ]
+
+  if (tags) lines.push(`🏷 ${tags}`)
+
+  lines.push(`🔗 <a href="${escapeHtml(repo.url)}">View on GitHub</a>`)
+
+  return lines.join('\n')
+}
+
+function assemble(repos: CuratedRepo[], today: string): string {
+  return [
+    `🔥 <b>GitHub Trending — Daily Digest</b>`,
+    `📅 ${escapeHtml(today)}  ·  TypeScript / JavaScript`,
+    '',
+    '━━━━━━━━━━━━━━━━━━━━━━',
+    '',
+    repos.map(repoEntry).join('\n\n'),
+    '',
+    '━━━━━━━━━━━━━━━━━━━━━━',
+    `📊 ${repos.length} ${repos.length === 1 ? 'repo' : 'repos'}  ·  Powered by GitHub Trending`,
+  ].join('\n')
+}
+
+export function buildTrendingMessage(repos: CuratedRepo[], today: string): string {
+  let kept = repos
+
+  while (kept.length > 1 && assemble(kept, today).length > TELEGRAM_MAX_CHARS) kept = kept.slice(0, -1)
+
+  return assemble(kept, today)
+}
 
 export const trendingTelegramTool = new DynamicStructuredTool({
   name: 'send_trending_telegram',
@@ -24,36 +71,7 @@ export const trendingTelegramTool = new DynamicStructuredTool({
   }),
   func: async ({ repos }) => {
     const today = new Date().toISOString().split('T')[0]
-
-    const numberEmojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣']
-
-    const repoLines = repos.map((r, i) => {
-      const num = numberEmojis[i] ?? `${i + 1}.`
-      // ponytail: the prompt asks for <140 chars, this is what actually guarantees it.
-      // Telegram hard-fails the whole message past 4096, so the bound lives in code.
-      const summary = r.summary.length > 140 ? `${r.summary.slice(0, 137)}...` : r.summary
-      return [
-        `${num} <b>${escapeHtml(r.repo_name)}</b>`,
-        `⭐ ${r.stars.toLocaleString()} (+${r.today_stars} today) · ${escapeHtml(r.language)}`,
-        `<i>${escapeHtml(summary)}</i>`,
-        `🏷 ${r.tags.map((t) => `#${escapeHtml(t)}`).join(' ')}`,
-        `🔗 <a href="${escapeHtml(r.url)}">View on GitHub</a>`,
-      ].join('\n')
-    })
-
-    const message = [
-      `🔥 <b>GitHub Trending — Daily Digest</b>`,
-      `📅 ${escapeHtml(today)}  ·  TypeScript / JavaScript`,
-      '',
-      '━━━━━━━━━━━━━━━━━━━━━━',
-      '',
-      repoLines.join('\n\n'),
-      '',
-      '━━━━━━━━━━━━━━━━━━━━━━',
-      `📊 ${repos.length} repos  ·  Powered by GitHub Trending`,
-    ].join('\n')
-
-    const chatId = await sendTelegramMessage(message, 'Trending repos')
+    const chatId = await sendTelegramMessage(buildTrendingMessage(repos, today), 'Trending repos')
 
     return JSON.stringify({ success: true, chat_id: chatId, date: today })
   },

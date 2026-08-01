@@ -1,6 +1,7 @@
 import { test, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { failLoudlyOnProviderError } from './llm.ts'
+import { createLlm, failLoudlyOnProviderError } from './llm.ts'
+import { DEFAULT_LLM, LLM_FALLBACK_MODELS } from '../constants/index.ts'
 
 const realFetch = globalThis.fetch
 
@@ -14,9 +15,6 @@ function stubFetch(body: string, init: { status?: number; contentType?: string }
   globalThis.fetch = (async () => new Response(body, { status, headers: { 'content-type': contentType } })) as typeof fetch
 }
 
-// The real payload that took the trending job down: HTTP 200, an `error` object,
-// and no `choices`. The OpenAI SDK treats 200 as success and hands back an empty
-// result, which only explodes later as `undefined.message`.
 test('throws on an HTTP 200 error body with no choices', async () => {
   stubFetch(JSON.stringify({ error: { message: 'Upstream error from Nvidia: ResourceExhausted (32/32)', code: 502 } }))
 
@@ -44,8 +42,6 @@ test('passes a normal completion straight through', async () => {
   assert.deepEqual(await res.json(), { choices: [{ message: { content: 'OK' } }] })
 })
 
-// A body carrying BOTH an error and choices is a partial success — the SDK can
-// still read a completion out of it, so it must not be turned into a throw.
 test('does not throw when choices are present alongside an error', async () => {
   stubFetch(JSON.stringify({ error: { message: 'partial' }, choices: [{ message: { content: 'OK' } }] }))
 
@@ -87,4 +83,25 @@ test('leaves the response body readable for the caller', async () => {
   const parsed = (await res.json()) as { choices: { message: { content: string } }[] }
 
   assert.equal(parsed.choices[0].message.content, 'still here')
+})
+
+test('every configured fallback actually reaches OpenRouter', () => {
+  const key = process.env.LLM_API_KEY
+  const model = process.env.LLM_MODEL
+
+  process.env.LLM_API_KEY = 'dummy'
+  delete process.env.LLM_MODEL
+
+  try {
+    const { modelKwargs } = createLlm() as unknown as { modelKwargs: { models: string[] } }
+
+    assert.equal(modelKwargs.models[0], DEFAULT_LLM, 'primary must be tried first')
+    for (const fb of LLM_FALLBACK_MODELS) {
+      assert.ok(modelKwargs.models.includes(fb), `configured fallback silently dropped: ${fb}`)
+    }
+  } finally {
+    if (key !== undefined) process.env.LLM_API_KEY = key
+    else delete process.env.LLM_API_KEY
+    if (model !== undefined) process.env.LLM_MODEL = model
+  }
 })
