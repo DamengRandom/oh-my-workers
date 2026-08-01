@@ -1,12 +1,6 @@
 import { ChatOpenAI } from '@langchain/openai'
 import { DEFAULT_LLM, DEFAULT_LLM_BASE_URL, LLM_FALLBACK_MODELS } from '../constants/index.js'
 
-// ponytail: OpenRouter answers HTTP 200 with an {error} body and NO `choices`
-// when the upstream provider is capacity-exhausted ("Worker local total request
-// limit reached (32/32)"). The OpenAI SDK sees 200, doesn't throw, and hands back
-// an empty result — which only blows up later inside LangChain as
-// `Cannot read properties of undefined (reading 'message')`, nowhere near the
-// real cause. Convert it to a real error here so retries and alerts can see it.
 export const failLoudlyOnProviderError: typeof fetch = async (input, init) => {
   const res = await fetch(input, init)
 
