@@ -7,8 +7,6 @@ import type { AiNewsItem } from '../schemas/index.js'
 
 const TAVILY_SEARCH_URL = 'https://api.tavily.com/search'
 
-// Only the fields the digest actually uses. `score` and `raw_content` come back
-// too and are deliberately dropped — see selectUnseen for why score is unused.
 type TavilyResult = {
   title?: string
   url?: string
@@ -25,8 +23,6 @@ function hostnameOf(url: string): string {
   }
 }
 
-// Tavily returns RFC-1123 ("Fri, 31 Jul 2026 04:00:00 GMT"). Postgres accepts it,
-// but normalising here means the stored value and the message agree.
 function toIsoDate(raw: string | null | undefined): string | null {
   if (!raw) return null
 
@@ -35,9 +31,6 @@ function toIsoDate(raw: string | null | undefined): string | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
 }
 
-// The HTTP half: credentials, the call, and the error surface. Throws rather
-// than returning empty, so a dead key or a rate limit reaches notifyError
-// instead of looking like a quiet news day.
 async function searchTavily(body: Record<string, unknown>): Promise<TavilyResult[]> {
   const apiKey = process.env.TAVILY_API_KEY ?? ''
 
@@ -58,17 +51,10 @@ async function searchTavily(body: Record<string, unknown>): Promise<TavilyResult
   return data.results ?? []
 }
 
-// Exported for testing, and because the digest's whole selection policy is these
-// three lines: drop what was already sent, keep Tavily's order, take the top N.
-// Tavily's `score` is relevance to the query, not popularity — sorting by it
-// promotes whatever best matches the words, not what matters. The query and the
-// domain allowlist do the quality work instead.
 export function selectUnseen(items: AiNewsItem[], seenUrls: Set<string>, topN: number): AiNewsItem[] {
   return items.filter((item) => !seenUrls.has(item.url)).slice(0, topN)
 }
 
-// Tavily sometimes returns a blank or padded title; the url is the last resort
-// so a story is never listed with no name at all.
 function titleOf(r: TavilyResult): string {
   return r.title?.trim() || String(r.url)
 }

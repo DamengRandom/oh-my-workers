@@ -1,15 +1,5 @@
 import { logger } from '../utils/logger.js'
 
-/**
- * Posts an HTML message to the configured Telegram chat.
- *
- * Both digests reached Telegram through the same twenty lines — read two env
- * vars, validate them, POST, check the status, log. This is that, once.
- * Message building stays in the tools; only delivery lives here.
- *
- * Throws on missing credentials and on any non-2xx, so callers can report the
- * failure through notifyError rather than guessing.
- */
 export async function sendTelegramMessage(html: string, label: string): Promise<string> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN ?? ''
   const chatId = process.env.TELEGRAM_CHAT_ID ?? ''

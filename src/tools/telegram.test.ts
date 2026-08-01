@@ -2,10 +2,6 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { sendTelegramMessage } from './telegram.ts'
 
-// Both digests deliver through this, so its failure modes are the ones that
-// decide whether a digest arrives or vanishes.
-// Restores process.env wholesale rather than key by key — the branchier version
-// of this helper was itself complex enough to trip the CRAP gate.
 async function withEnvAndFetch(env: NodeJS.ProcessEnv, stub: typeof fetch, fn: () => Promise<void>): Promise<void> {
   const savedEnv = { ...process.env }
   const realFetch = globalThis.fetch

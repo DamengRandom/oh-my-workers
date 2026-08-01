@@ -21,9 +21,6 @@ afterEach(() => {
   globalThis.fetch = realFetch
 })
 
-// Telegram's HTML mode rejects any tag outside its whitelist with a 400, and the
-// alert is then never delivered. Real errors carry markup: gateway 502 bodies are
-// HTML, and reasoning models emit <think>.
 test('escapes markup in the error so Telegram can parse the alert', async () => {
   await notifyError('AI news search', new Error('Tavily API error 502: <html><body>upstream connect error</body></html>'))
 
@@ -55,8 +52,6 @@ test('keeps an oversized error inside Telegram limit', async () => {
   assert.ok(sent!.text.length <= 4096, `message was ${sent!.text.length} chars`)
 })
 
-// Cutting an escaped string can land mid-entity ("&qu"), which Telegram rejects.
-// Cutting first and escaping after makes that impossible.
 test('never emits a half-escaped entity', async () => {
   await notifyError('AI news search', new Error('"'.repeat(5000)))
 
