@@ -4,8 +4,6 @@ import { toKpiRecord } from './kpi-record.ts'
 
 const NOW = '2026-07-31T00:00:00.000Z'
 
-// The real tool hardcodes summary: '' and the agent is told not to touch it, so
-// this is what every GitHub-only day actually looks like.
 test('describes the activity when the agent supplied no summary', () => {
   const record = toKpiRecord(JSON.stringify({ summary: '', commits: [1, 2, 3, 4], pullRequests: [1, 2, 3, 4, 5, 6] }), NOW)
 
@@ -36,9 +34,6 @@ test('maps a complete GitHub payload', () => {
   assert.equal(record.updated_at, NOW)
 })
 
-// The GitHub tool output is relayed through an LLM, so any field can go missing.
-// Zeros are the right answer here — but only if they come from genuinely absent
-// data, which is what these cases pin down.
 test('defaults every missing field rather than throwing', () => {
   const record = toKpiRecord(JSON.stringify({}), NOW)
 
@@ -76,8 +71,6 @@ test('counts empty arrays as zero, not missing', () => {
   assert.equal(record.prs_count, 0)
 })
 
-// A real 0-commit day and a broken payload both produce zeros, so the summary is
-// the only thing distinguishing them downstream. Worth keeping honest.
 test('keeps the summary when counts are legitimately zero', () => {
   const record = toKpiRecord(JSON.stringify({ summary: 'no code today', commits: [], pullRequests: [] }), NOW)
 

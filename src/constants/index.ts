@@ -11,8 +11,7 @@ export const TRENDING_TAG_MAX = 24
 export const COMPANY_CLEANUP_TABLE = 'mockTestUsers'
 export const COMPANY_CLEANUP_THRESHOLD_DAYS = '30'
 // ── AI news digest (Tavily) ──────────────────────────────────────────────────
-// How many stories make the digest.
-export const AI_NEWS_TOP_N = 4
+export const AI_NEWS_TOP_N = 4 // How many stories make the digest.
 export const AI_NEWS_FETCH_N = 10
 export const AI_NEWS_LOOKBACK_DAYS = 1
 export const AI_NEWS_SNIPPET_MAX = 200

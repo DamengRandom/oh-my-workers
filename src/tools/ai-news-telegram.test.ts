@@ -75,10 +75,6 @@ test('counts stories with the right plural', () => {
   assert.match(buildAiNewsMessage([story(), story()], '2026-07-31'), /📊 2 stories /)
 })
 
-// Telegram rejects the whole message past 4096, so a digest that overflows is
-// not truncated — it is lost. Title and snippet are both bounded now, so this
-// really is the worst case, and it fails if TOP_N is raised past what the
-// format can carry.
 test('a worst-case digest stays inside the 4096-char limit Telegram hard-fails at', () => {
   const worst = Array.from({ length: AI_NEWS_TOP_N }, () =>
     story({

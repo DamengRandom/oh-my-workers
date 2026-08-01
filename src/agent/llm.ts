@@ -32,8 +32,6 @@ export const createLlm = (temperature = 0) => {
     model,
     apiKey,
     temperature,
-    // OpenRouter routes to the next model when one errors or is at capacity.
-    // It rejects more than 3 entries, primary included.
     modelKwargs: { models: [model, ...LLM_FALLBACK_MODELS.filter((m) => m !== model)].slice(0, 3) },
     configuration: {
       baseURL: process.env.LLM_BASE_URL || DEFAULT_LLM_BASE_URL,

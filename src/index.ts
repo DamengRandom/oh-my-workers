@@ -39,8 +39,6 @@ async function main(): Promise<void> {
     process.exit(0)
   }
 
-  // No recognized args — scheduling is handled by GitHub Actions, not an
-  // in-process daemon. Point the user at the actual options instead.
   logger.info('No job specified. Use --job=<name> to run one, or --list-jobs to see all.')
   printJobs()
   process.exit(0)

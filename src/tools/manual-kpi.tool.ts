@@ -31,9 +31,6 @@ async function collectActivities(): Promise<string[]> {
     return activities
   }
 
-  // Local mode: interactive readline prompt. These go straight to stdout — a
-  // timestamped, levelled log line would not read as a question, and pino's
-  // stream does not interleave predictably with readline's own output.
   prompt('\n──────────────────────────────────────────')
   prompt('📝 Anything else you did today?')
   prompt('📝 (Enter each activity on a new line)')

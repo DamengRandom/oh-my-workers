@@ -61,9 +61,6 @@ test('omits the tag line entirely when the curator returned none', () => {
   assert.match(message, /⭐ 238,000/) // the rest of the entry is intact
 })
 
-// The bug this file was written for: tags were uncapped, so one verbose entry
-// pushed the digest past Telegram's limit and Telegram rejected the WHOLE
-// message — losing seven perfectly normal repos along with the one bad one.
 test('one repo with a pathological tags array cannot cost the whole digest', () => {
   const normal = Array.from({ length: TRENDING_TOP_N - 1 }, () => repo())
   const badApple = repo({ tags: Array.from({ length: 40 }, (_, i) => `machine-learning-infrastructure-tag-${i}`) })
@@ -87,8 +84,6 @@ test('a worst-case digest stays inside the limit Telegram hard-fails at', () => 
   assert.ok(buildTrendingMessage(worst, '2026-08-01').length <= TELEGRAM_MAX_CHARS)
 })
 
-// Escaping expands text after the per-field caps run (`&` becomes `&amp;`), so
-// the caps alone cannot guarantee the invariant — the trim guard does.
 test('drops trailing repos rather than emitting a message Telegram will reject', () => {
   const bomb = Array.from({ length: TRENDING_TOP_N }, () => repo({ summary: '&'.repeat(TRENDING_SUMMARY_MAX) }))
   const message = buildTrendingMessage(bomb, '2026-08-01')
