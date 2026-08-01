@@ -175,13 +175,7 @@ export class WorkCoordinator {
   private static async curateRepos(newRepos: TrendingRepo[], feedback?: string): Promise<string> {
     logger.info('⚡️ Writing digest summaries...')
 
-    try {
-      return await curateTrending(newRepos, feedback)
-    } catch (err) {
-      logger.error({ err }, '❌ Trending curation attempt failed')
-
-      return ''
-    }
+    return curateTrending(newRepos, feedback)
   }
 
   // Step 4: deliver the digest via Telegram. Returns whether the send succeeded.
