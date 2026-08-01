@@ -3,8 +3,6 @@ import { createLlm } from './llm.js'
 import { TRENDING_CURATOR_PROMPT } from './prompt.js'
 import type { TrendingRepo } from '../schemas/index.js'
 
-// The model only writes prose. Star counts, URLs and ordering come from the
-// scrape, so no amount of hallucination can corrupt the numbers on the digest.
 const SummarySchema = z.object({
   repos: z.array(
     z.object({
@@ -15,9 +13,6 @@ const SummarySchema = z.object({
   ),
 })
 
-// Exported for testing: merges model prose back onto the authoritative scraped
-// rows, preserving the caller's (star-growth) ordering and dropping any repo the
-// model invented.
 export function mergeSummaries(repos: TrendingRepo[], summaries: z.infer<typeof SummarySchema>['repos']) {
   const byName = new Map(summaries.map((s) => [s.repo_name, s]))
 
@@ -41,10 +36,6 @@ export function mergeSummaries(repos: TrendingRepo[], summaries: z.infer<typeof 
   })
 }
 
-// ponytail: one structured-output call, not an agent. The old curate_trending_repos
-// tool just echoed its own input back, so the tool loop bought nothing — and its
-// post-tool "done" model call is what threw away a good 92s curation when the
-// provider returned an error body with no choices. Retries live in curator.graph.
 export async function curateTrending(repos: TrendingRepo[], feedback?: string): Promise<string> {
   const listing = repos.map((r) => `${r.name} (${r.todayStars} stars today, ${r.stars} total, ${r.language}) — ${r.description}`).join('\n')
 
