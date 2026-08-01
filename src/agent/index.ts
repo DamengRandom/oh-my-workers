@@ -329,7 +329,8 @@ export class WorkCoordinator {
   }
 
   // Step 3 with its failure handling: null means stop, and the alert has already
-  // been sent. An empty result is a skip, not a failure — nothing to alert on.
+  // been sent. collectTopRepos only returns a non-empty list, so there is no
+  // "nothing to curate" case here — an empty curation is a failure.
   private static async curateOrNotify(topRepos: TrendingRepo[]): Promise<CuratedRepo[] | null> {
     const { curated, error } = await runCuratorGraph(topRepos, WorkCoordinator.curateRepos)
 
@@ -338,11 +339,6 @@ export class WorkCoordinator {
 
       await notifyError('Trending curator agent', error ?? 'curation failed after retries')
 
-      return null
-    }
-
-    if (!curated.length) {
-      logger.info('⏭️ No repos curated — skipping send and save.')
       return null
     }
 

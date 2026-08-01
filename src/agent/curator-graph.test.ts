@@ -91,6 +91,36 @@ test('well-formed JSON that fails the schema produces a distinguishably differen
   assert.doesNotMatch(result.error ?? '', /not valid JSON/)
 })
 
+// mergeSummaries drops any repo the model did not echo back by exact name, so a
+// schema-valid response with reformatted names curates nothing at all. The input
+// is never empty, so this is total failure, not a quiet day.
+const emptyCuratorOutput = JSON.stringify({ repos: [] })
+
+test('treats an empty curation as a failure, not a quiet day', async () => {
+  const fakeCurate = async () => emptyCuratorOutput
+
+  const result = await runCuratorGraph(sampleRepos, fakeCurate)
+
+  assert.equal(result.curated, null, 'an empty result must not be reported as success')
+  assert.match(result.error ?? '', /none of the 1 repos/)
+})
+
+test('retries an empty curation and tells the model which name to echo', async () => {
+  let calls = 0
+  const feedback: (string | undefined)[] = []
+  const fakeCurate = async (_repos: TrendingRepo[], fb?: string) => {
+    calls++
+    feedback.push(fb)
+    return calls === 1 ? emptyCuratorOutput : validCuratorOutput
+  }
+
+  const result = await runCuratorGraph(sampleRepos, fakeCurate)
+
+  assert.equal(calls, 2, 'an empty curation should be retried')
+  assert.equal(result.curated?.[0].repo_name, 'foo/bar')
+  assert.match(feedback[1] ?? '', /foo\/bar/, 'the retry should name the repo the model failed to match')
+})
+
 test('an exception thrown by curate() is caught and recorded instead of crashing the graph', async () => {
   const fakeCurate = async () => {
     throw new Error('rate limited')
