@@ -64,11 +64,6 @@ export async function initDb(): Promise<void> {
     );
   `)
 
-  // The T15 AI news feature (removed in T20) left an ai_news table behind on any
-  // database it ever ran against — including production. CREATE TABLE IF NOT
-  // EXISTS silently keeps that older shape, so inserts fail on the missing
-  // columns until it is brought forward. Its `summary` held what is now
-  // `snippet`, so the rename preserves the old rows as dedupe history.
   await pool.query(`
     DO $$
     BEGIN
@@ -119,9 +114,6 @@ export async function saveCleanupLog(result: CleanupResult, tableName: string): 
   )
 }
 
-// One row per repo. A repo that trends again updates in place — star counts stay
-// current instead of going stale behind a dedup filter. created_at keeps its
-// original value, so it still reads as "first seen".
 export async function saveTrendingRepos(repos: TrendingRepoLog[]): Promise<void> {
   for (const repo of repos) {
     await pool.query(
@@ -154,9 +146,6 @@ export async function saveTrendingRepos(repos: TrendingRepoLog[]): Promise<void>
   }
 }
 
-// One row per story, keyed on url. A story that resurfaces updates in place
-// rather than inserting a duplicate — created_at keeps its original value, so it
-// still reads as "first seen".
 export async function saveAiNews(items: AiNewsLog[]): Promise<void> {
   for (const item of items) {
     await pool.query(
