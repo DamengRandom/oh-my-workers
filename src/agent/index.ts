@@ -328,9 +328,7 @@ export class WorkCoordinator {
     return WorkCoordinator.rankByGrowth(allRepos)
   }
 
-  // Step 3 with its failure handling: null means stop, and the alert has already
-  // been sent. collectTopRepos only returns a non-empty list, so there is no
-  // "nothing to curate" case here — an empty curation is a failure.
+  // Step 3 with its failure handling: null means stop, and the alert has already been sent.
   private static async curateOrNotify(topRepos: TrendingRepo[]): Promise<CuratedRepo[] | null> {
     const { curated, error } = await runCuratorGraph(topRepos, WorkCoordinator.curateRepos)
 

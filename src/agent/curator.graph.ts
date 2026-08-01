@@ -47,9 +47,6 @@ async function curateNode(state: { repos: TrendingRepo[]; error: string | null; 
     return { error: `curator output did not match the expected schema: ${parsed.error.message}`, attempts: state.attempts + 1 }
   }
 
-  // The caller only ever passes a non-empty list, so nothing to curate means the
-  // curator matched none of the repos it was given — a failure, and a retryable
-  // one, since the feedback tells the model to echo repo_name exactly.
   if (!parsed.data.repos.length) {
     return {
       error: `curator returned summaries for none of the ${state.repos.length} repos it was given — repo_name must match exactly, e.g. "${state.repos[0]?.name}"`,

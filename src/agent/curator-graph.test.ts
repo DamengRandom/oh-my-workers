@@ -91,9 +91,6 @@ test('well-formed JSON that fails the schema produces a distinguishably differen
   assert.doesNotMatch(result.error ?? '', /not valid JSON/)
 })
 
-// mergeSummaries drops any repo the model did not echo back by exact name, so a
-// schema-valid response with reformatted names curates nothing at all. The input
-// is never empty, so this is total failure, not a quiet day.
 const emptyCuratorOutput = JSON.stringify({ repos: [] })
 
 test('treats an empty curation as a failure, not a quiet day', async () => {
