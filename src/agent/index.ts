@@ -178,22 +178,24 @@ export class WorkCoordinator {
     return curateTrending(newRepos, feedback)
   }
 
-  // Step 4: deliver the digest via Telegram. Returns whether the send succeeded.
-  private static async sendTelegram(repos: CuratedRepo[]): Promise<boolean> {
+  // Step 4: deliver the digest via Telegram. Returns the repo names that went out.
+  private static async sendTelegram(repos: CuratedRepo[]): Promise<Set<string>> {
     logger.info('⚡️ Sending trending digest via Telegram...')
 
     try {
-      await trendingTelegramTool.invoke({ repos })
-      return true
+      const raw = await trendingTelegramTool.invoke({ repos })
+      const { delivered } = parseJson<{ delivered?: string[] }>(raw, {})
+
+      return new Set(delivered ?? [])
     } catch (err) {
       logger.error({ err }, '❌ Telegram delivery failed')
       await notifyError('Trending Telegram delivery', err)
-      return false
+      return new Set()
     }
   }
 
-  // Step 5: persist the curated repos, tagging whether delivery succeeded.
-  private static async saveTrending(repos: CuratedRepo[], sent: boolean, now: string): Promise<void> {
+  // Step 5: persist the curated repos, tagging each with whether it was delivered.
+  private static async saveTrending(repos: CuratedRepo[], delivered: Set<string>, now: string): Promise<void> {
     try {
       await saveTrendingRepos(
         repos.map((r) => ({
@@ -205,12 +207,12 @@ export class WorkCoordinator {
           today_stars: r.today_stars,
           summary: r.summary,
           tags: r.tags,
-          sent,
+          sent: delivered.has(r.repo_name),
           created_at: now,
           updated_at: now,
         }))
       )
-      logger.info(`✅ Saved ${repos.length} trending repos to database.`)
+      logger.info(`✅ Saved ${repos.length} trending repos to database (${delivered.size} marked sent).`)
     } catch (err) {
       logger.error({ err }, '❌ Failed to save trending repos')
       await notifyError('saveTrendingRepos', err)
@@ -360,10 +362,10 @@ export class WorkCoordinator {
     if (!curated) return
 
     // ── Step 4: Send via Telegram ───────────────────────────────────────────
-    const sent = await WorkCoordinator.sendTelegram(curated)
+    const delivered = await WorkCoordinator.sendTelegram(curated)
 
     // ── Step 5: Save to DB ──────────────────────────────────────────────────
-    await WorkCoordinator.saveTrending(curated, sent, now)
+    await WorkCoordinator.saveTrending(curated, delivered, now)
 
     sectionLogger(`✅ GitHub Trending job complete for ${today}`)
   }
