@@ -43,9 +43,18 @@ async function curateNode(state: { repos: TrendingRepo[]; error: string | null; 
   }
 
   const parsed = CuratedRepoOutputSchema.safeParse(json)
-  if (parsed.success) return { curated: parsed.data.repos, error: null }
+  if (!parsed.success) {
+    return { error: `curator output did not match the expected schema: ${parsed.error.message}`, attempts: state.attempts + 1 }
+  }
 
-  return { error: `curator output did not match the expected schema: ${parsed.error.message}`, attempts: state.attempts + 1 }
+  if (!parsed.data.repos.length) {
+    return {
+      error: `curator returned summaries for none of the ${state.repos.length} repos it was given — repo_name must match exactly, e.g. "${state.repos[0]?.name}"`,
+      attempts: state.attempts + 1,
+    }
+  }
+
+  return { curated: parsed.data.repos, error: null }
 }
 
 export async function runCuratorGraph(repos: TrendingRepo[], curate: CurateFn): Promise<CuratorResult> {
