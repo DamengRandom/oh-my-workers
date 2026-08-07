@@ -5,13 +5,17 @@ import { TrendingRepo } from '../schemas/index.ts'
 
 const NAMED_ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' }
 
+function decodeNumericRef(ref: string): string | null {
+  const code = ref[1].toLowerCase() === 'x' ? parseInt(ref.slice(2), 16) : parseInt(ref.slice(1), 10)
+
+  return Number.isNaN(code) || code > 0x10ffff ? null : String.fromCodePoint(code)
+}
+
 function decodeEntities(text: string): string {
   return text.replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, (entity, ref: string) => {
-    if (ref[0] !== '#') return NAMED_ENTITIES[ref.toLowerCase()] ?? entity
+    const decoded = ref[0] === '#' ? decodeNumericRef(ref) : NAMED_ENTITIES[ref.toLowerCase()]
 
-    const code = ref[1].toLowerCase() === 'x' ? parseInt(ref.slice(2), 16) : parseInt(ref.slice(1), 10)
-
-    return Number.isNaN(code) || code > 0x10ffff ? entity : String.fromCodePoint(code)
+    return decoded ?? entity
   })
 }
 

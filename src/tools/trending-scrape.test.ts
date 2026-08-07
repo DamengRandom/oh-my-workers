@@ -42,6 +42,7 @@ test('a decoded angle bracket is text, not markup to strip a second time', () =>
 test('leaves something that only looks like an entity untouched', () => {
   assert.equal(descriptionOf('Sold &notanentity; separately'), 'Sold &notanentity; separately')
   assert.equal(descriptionOf('Costs AT&T money'), 'Costs AT&T money')
+  assert.equal(descriptionOf('Out of range &#9999999; here'), 'Out of range &#9999999; here')
 })
 
 test('still reads the name, language and both star counts', () => {
