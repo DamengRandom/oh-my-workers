@@ -3,7 +3,19 @@ import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
 import { TrendingRepo } from '../schemas/index.ts'
 
-function parseTrendingHtml(html: string): TrendingRepo[] {
+const NAMED_ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' }
+
+function decodeEntities(text: string): string {
+  return text.replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, (entity, ref: string) => {
+    if (ref[0] !== '#') return NAMED_ENTITIES[ref.toLowerCase()] ?? entity
+
+    const code = ref[1].toLowerCase() === 'x' ? parseInt(ref.slice(2), 16) : parseInt(ref.slice(1), 10)
+
+    return Number.isNaN(code) || code > 0x10ffff ? entity : String.fromCodePoint(code)
+  })
+}
+
+export function parseTrendingHtml(html: string): TrendingRepo[] {
   const repos: TrendingRepo[] = []
   const articleRegex = /<article class="Box-row">([\s\S]*?)<\/article>/g
 
@@ -18,7 +30,7 @@ function parseTrendingHtml(html: string): TrendingRepo[] {
 
     // Description
     const descMatch = block.match(/<p class="col-9[^"]*"[^>]*>([\s\S]*?)<\/p>/)
-    const description = descMatch ? descMatch[1].replace(/<[^>]+>/g, '').trim() : ''
+    const description = descMatch ? decodeEntities(descMatch[1].replace(/<[^>]+>/g, '')).trim() : ''
 
     // Language
     const langMatch = block.match(/<span itemprop="programmingLanguage">([\s\S]*?)<\/span>/)
