@@ -45,7 +45,7 @@ export function parseTrendingHtml(html: string): TrendingRepo[] {
     const stars = starsMatch ? parseInt(starsMatch[1].replace(/,/g, ''), 10) : 0
 
     // Stars today
-    const todayMatch = block.match(/([\d,]+)\s+stars\s+today/)
+    const todayMatch = block.match(/([\d,]+)\s+stars?\s+today/)
     const todayStars = todayMatch ? parseInt(todayMatch[1].replace(/,/g, ''), 10) : 0
 
     repos.push({
