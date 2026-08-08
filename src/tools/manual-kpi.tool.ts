@@ -3,20 +3,6 @@ import { z } from 'zod'
 import * as readline from 'readline'
 import { logger, prompt } from '../utils/logger.js'
 
-function promptUser(question: string): Promise<string> {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
-
-  return new Promise((resolve) => {
-    rl.on('close', () => resolve(''))
-
-    rl.question(question, (answer) => {
-      resolve(answer.trim())
-
-      rl.close()
-    })
-  })
-}
-
 // Read activities from env var (GitHub Actions) or fall back to interactive readline (local terminal)
 async function collectActivities(): Promise<string[]> {
   const now = new Date().toISOString()
@@ -38,14 +24,22 @@ async function collectActivities(): Promise<string[]> {
   prompt('📝 (Enter each activity on a new line)')
   prompt('📝 Type "done" when finished.\n')
 
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
   const activities: string[] = []
 
-  while (true) {
-    const input = await promptUser('  > ')
+  rl.setPrompt('  > ')
+  rl.prompt()
+
+  for await (const line of rl) {
+    const input = line.trim()
 
     if (input.toLowerCase() === 'done' || input === '') break
-    if (input.length > 0) activities.push(input)
+
+    activities.push(input)
+    rl.prompt()
   }
+
+  rl.close()
 
   prompt('──────────────────────────────────────────\n')
 

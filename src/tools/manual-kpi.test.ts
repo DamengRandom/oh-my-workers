@@ -55,3 +55,12 @@ test('still records an activity that arrived before stdin ended', async () => {
 test('still treats a blank line as the end of input', async () => {
   assert.deepEqual(activitiesFrom(await collect('Paired on the auth bug\n\n')), ['Paired on the auth bug'])
 })
+
+// Every line lands in one stdin chunk here, which is what a paste looks like.
+test('keeps every activity when the lines arrive together rather than one at a time', async () => {
+  assert.deepEqual(activitiesFrom(await collect('Reviewed 3 PRs\nRan the release\nMentored a junior\ndone\n')), [
+    'Reviewed 3 PRs',
+    'Ran the release',
+    'Mentored a junior',
+  ])
+})
