@@ -8,7 +8,11 @@ export function escapeHtml(text: string): string {
 
 // Ellipsis included in the budget, so the result is never longer than max.
 export function truncate(text: string, max: number): string {
-  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text
+  if (text.length <= max) return text
+
+  const cut = text.slice(0, max - 1).replace(/[\uD800-\uDBFF]$/, '')
+
+  return `${cut.trimEnd()}…`
 }
 
 export function toolOutput(result: AgentResult, toolName: string): string {
