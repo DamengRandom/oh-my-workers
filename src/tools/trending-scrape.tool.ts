@@ -70,6 +70,7 @@ export const trendingScrapeTool = new DynamicStructuredTool({
   func: async ({ languages }) => {
     const allRepos: TrendingRepo[] = []
     const seen = new Set<string>()
+    const failures: string[] = []
 
     for (const lang of languages) {
       const url = `https://github.com/trending/${lang}?since=daily`
@@ -77,6 +78,7 @@ export const trendingScrapeTool = new DynamicStructuredTool({
 
       if (!response.ok) {
         logger.error(`❌ Failed to fetch trending/${lang}: ${response.status}`)
+        failures.push(`${lang}: ${response.status}`)
         continue
       }
 
@@ -89,6 +91,10 @@ export const trendingScrapeTool = new DynamicStructuredTool({
           allRepos.push(repo)
         }
       }
+    }
+
+    if (failures.length && failures.length === languages.length) {
+      throw new Error(`GitHub trending is unreachable — every page failed (${failures.join(', ')})`)
     }
 
     logger.info(`🔍 Scraped ${allRepos.length} trending repos from GitHub`)
