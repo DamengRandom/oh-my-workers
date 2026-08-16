@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseTrendingHtml } from './trending-scrape.tool.ts'
+import { parseTrendingHtml, trendingScrapeTool } from './trending-scrape.tool.ts'
 
 // Trimmed from a real github.com/trending/typescript?since=daily response.
 const article = (description: string) => `
@@ -92,4 +92,52 @@ test('falls back to zero only when the growth line is genuinely absent', () => {
 
   assert.equal(repo.todayStars, 0)
   assert.equal(repo.name, 'foo/bar')
+})
+
+// ── Fetch boundary ───────────────────────────────────────────────────────────
+
+async function withFetch(stub: typeof fetch, fn: () => Promise<void>): Promise<void> {
+  const real = globalThis.fetch
+
+  globalThis.fetch = stub
+
+  try {
+    await fn()
+  } finally {
+    globalThis.fetch = real
+  }
+}
+
+// An empty array reads as a quiet day, so the caller sends no digest and no alert.
+test('throws when every trending page fails rather than reporting a quiet day', async () => {
+  await withFetch(
+    async () => new Response('rate limited', { status: 429 }),
+    async () => {
+      await assert.rejects(() => trendingScrapeTool.invoke({ languages: ['typescript', 'javascript'] }), /every page failed/)
+    }
+  )
+})
+
+test('names the languages and status codes so the alert says what happened', async () => {
+  await withFetch(
+    async (target) => new Response('nope', { status: String(target).includes('typescript') ? 429 : 503 }),
+    async () => {
+      await assert.rejects(() => trendingScrapeTool.invoke({ languages: ['typescript', 'javascript'] }), /typescript: 429.*javascript: 503/)
+    }
+  )
+})
+
+test('still returns what one working page gave when the other fails', async () => {
+  await withFetch(
+    async (target) =>
+      String(target).includes('typescript')
+        ? new Response('server error', { status: 500 })
+        : new Response(articleWithCounts('foo/bar', '10', '3 stars today'), { status: 200 }),
+    async () => {
+      const repos = JSON.parse(await trendingScrapeTool.invoke({ languages: ['typescript', 'javascript'] }))
+
+      assert.equal(repos.length, 1)
+      assert.equal(repos[0].name, 'foo/bar')
+    }
+  )
 })
