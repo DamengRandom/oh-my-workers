@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { Pool } from 'pg'
 
 const DB_DOWN = 'connect ECONNREFUSED 10.0.0.5:5432'
+const TODAY = '2026-08-18'
 
 let dbDown = false
 let repliesInProse = false
@@ -16,69 +17,67 @@ let repliesInProse = false
 
 const alerts: string[] = []
 
-function completion(message: Record<string, unknown>) {
-  return new Response(
-    JSON.stringify({
-      id: 'stub',
-      object: 'chat.completion',
-      created: 0,
-      model: 'stub',
-      choices: [{ index: 0, finish_reason: message.tool_calls ? 'tool_calls' : 'stop', message }],
-      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-    }),
-    { status: 200, headers: { 'content-type': 'application/json' } }
-  )
+type LlmRequest = { tools?: { function: { name: string } }[]; messages: { role: string }[] }
+
+const DONE = { role: 'assistant', content: 'done' }
+const PROSE = { role: 'assistant', content: 'Here is your KPI report: one commit, one PR. Great work!' }
+
+const SAVED_REPORT = {
+  report_content: 'A solid day.',
+  github_summary: 'no commits, no PRs on GitHub',
+  commits_count: 0,
+  prs_count: 0,
+  activities: ['Reviewed 3 PRs'],
 }
 
-const call = (name: string, args: unknown) => ({ id: name, type: 'function', function: { name, arguments: JSON.stringify(args) } })
+function jsonResponse(payload: unknown): Response {
+  return new Response(JSON.stringify(payload), { status: 200, headers: { 'content-type': 'application/json' } })
+}
 
-const EMPTY_SEARCH = { total_count: 0, items: [] }
+function completion(message: Record<string, unknown>): Response {
+  return jsonResponse({
+    id: 'stub',
+    object: 'chat.completion',
+    created: 0,
+    model: 'stub',
+    choices: [{ index: 0, finish_reason: message.tool_calls ? 'tool_calls' : 'stop', message }],
+    usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+  })
+}
+
+const toolCall = (name: string, args: unknown) => ({
+  role: 'assistant',
+  content: null,
+  tool_calls: [{ id: name, type: 'function', function: { name, arguments: JSON.stringify(args) } }],
+})
+
+const offeredTools = (body: LlmRequest) => (body.tools ?? []).map((t) => t.function.name)
+
+const diaryReply = () => (repliesInProse ? PROSE : toolCall('save_daily_kpi_report', SAVED_REPORT))
+
+function llmReply(body: LlmRequest) {
+  if (body.messages.some((m) => m.role === 'tool')) return DONE
+
+  const offered = offeredTools(body)
+
+  if (offered.includes('fetch_github_activity')) return toolCall('fetch_github_activity', { username: 'octocat', date: TODAY })
+  if (offered.includes('save_daily_kpi_report')) return diaryReply()
+
+  return DONE
+}
+
+function recordAlert(body: { text: string }): Response {
+  alerts.push(body.text)
+
+  return new Response('{"ok":true}', { status: 200 })
+}
 
 globalThis.fetch = (async (target: unknown, init: { body?: string }) => {
   const url = String(target)
-  const body = init?.body ? JSON.parse(init.body) : null
 
-  if (url.includes('api.github.com/search/'))
-    return new Response(JSON.stringify(EMPTY_SEARCH), { status: 200, headers: { 'content-type': 'application/json' } })
-
-  if (url.includes('telegram')) {
-    alerts.push(body.text)
-
-    return new Response('{"ok":true}', { status: 200 })
-  }
-
-  if (url.includes('openrouter')) {
-    const tools: { function: { name: string } }[] = body.tools ?? []
-    const answered = body.messages.some((m: { role: string }) => m.role === 'tool')
-
-    if (!answered && tools.some((t) => t.function.name === 'fetch_github_activity')) {
-      return completion({
-        role: 'assistant',
-        content: null,
-        tool_calls: [call('fetch_github_activity', { username: 'octocat', date: '2026-08-18' })],
-      })
-    }
-
-    if (!answered && tools.some((t) => t.function.name === 'save_daily_kpi_report')) {
-      if (repliesInProse) return completion({ role: 'assistant', content: 'Here is your KPI report: one commit, one PR. Great work!' })
-
-      return completion({
-        role: 'assistant',
-        content: null,
-        tool_calls: [
-          call('save_daily_kpi_report', {
-            report_content: 'A solid day.',
-            github_summary: 'no commits, no PRs on GitHub',
-            commits_count: 0,
-            prs_count: 0,
-            activities: ['Reviewed 3 PRs'],
-          }),
-        ],
-      })
-    }
-
-    return completion({ role: 'assistant', content: 'done' })
-  }
+  if (url.includes('api.github.com/search/')) return jsonResponse({ total_count: 0, items: [] })
+  if (url.includes('openrouter')) return completion(llmReply(JSON.parse(String(init.body))))
+  if (url.includes('telegram')) return recordAlert(JSON.parse(String(init.body)))
 
   throw new Error(`unexpected fetch: ${url}`)
 }) as unknown as typeof fetch
