@@ -70,7 +70,7 @@ export class WorkCoordinator {
     logger.info(`⚡️ Phase 3: Generating daily KPI report (${activityCount} manual activities recorded)...`)
 
     try {
-      await diaryAgent().invoke({
+      const result = await diaryAgent().invoke({
         messages: [
           {
             role: 'user',
@@ -78,6 +78,14 @@ export class WorkCoordinator {
           },
         ],
       })
+
+      // A tool that throws comes back as a tool message, not a rejection — the day is
+      // only saved if the tool itself says so.
+      const saved = toolOutput(result, 'save_daily_kpi_report')
+
+      if (!parseJson<{ success?: boolean }>(saved, {}).success) {
+        throw new Error(`save_daily_kpi_report did not save the report — ${saved || 'the agent never called it'}`)
+      }
     } catch (err) {
       logger.error({ err }, '❌ Diary agent failed')
 
