@@ -7,10 +7,15 @@ const TODAY = '2026-08-18'
 
 let dbDown = false
 let repliesInProse = false
+let githubUnauthorized = false
+
+const kpiRows: unknown[][] = []
 
 // own-db.ts builds its pool when the module loads, so the stub has to land first.
-;(Pool.prototype as unknown as { query: unknown }).query = async (text: unknown) => {
+;(Pool.prototype as unknown as { query: unknown }).query = async (text: unknown, params: unknown[]) => {
   if (dbDown && /INSERT INTO (kpi|diary)/.test(String(text))) throw new Error(DB_DOWN)
+
+  if (/INSERT INTO kpi/.test(String(text))) kpiRows.push(params)
 
   return { rows: [], rowCount: 0 }
 }
@@ -75,7 +80,16 @@ function recordAlert(body: { text: string }): Response {
 globalThis.fetch = (async (target: unknown, init: { body?: string }) => {
   const url = String(target)
 
-  if (url.includes('api.github.com/search/')) return jsonResponse({ total_count: 0, items: [] })
+  if (url.includes('api.github.com/search/')) {
+    if (githubUnauthorized) {
+      return new Response(JSON.stringify({ message: 'Bad credentials', documentation_url: 'https://docs.github.com/rest' }), {
+        status: 401,
+        headers: { 'content-type': 'application/json' },
+      })
+    }
+
+    return jsonResponse({ total_count: 0, items: [] })
+  }
   if (url.includes('openrouter')) return completion(llmReply(JSON.parse(String(init.body))))
   if (url.includes('telegram')) return recordAlert(JSON.parse(String(init.body)))
 
@@ -93,8 +107,11 @@ const { runDailyJobs } = await import('./index.ts')
 
 beforeEach(() => {
   alerts.length = 0
+  kpiRows.length = 0
   dbDown = false
   repliesInProse = false
+  githubUnauthorized = false
+  process.env.MANUAL_ACTIVITIES = 'Reviewed 3 PRs'
 })
 
 // The GitHub-only path already alerts on exactly this failure, so a day carrying
@@ -122,4 +139,36 @@ test('stays quiet when the report is actually saved', async () => {
   await runDailyJobs()
 
   assert.deepEqual(alerts, [])
+})
+
+// A commas-only value takes the non-interactive branch and yields no activities,
+// which is the path that persists a GitHub-only record.
+test('records no KPI day at all when the GitHub fetch was refused', async () => {
+  githubUnauthorized = true
+  process.env.MANUAL_ACTIVITIES = ','
+
+  await runDailyJobs()
+
+  assert.deepEqual(kpiRows, [], 'a day whose activity was never fetched must not be saved as zero activity')
+})
+
+test('alerts when the GitHub fetch was refused rather than reporting a quiet day', async () => {
+  githubUnauthorized = true
+  process.env.MANUAL_ACTIVITIES = ','
+
+  await runDailyJobs()
+
+  assert.equal(alerts.length, 1, 'an unfetched GitHub day must leave an alert')
+  assert.match(alerts[0], /GitHub agent/)
+  assert.match(alerts[0], /Bad credentials/)
+})
+
+test('does not hand the diary agent an error message as the day’s GitHub activity', async () => {
+  githubUnauthorized = true
+
+  await runDailyJobs()
+
+  assert.deepEqual(kpiRows, [], 'the diary path must not write a report about data it never received')
+  assert.equal(alerts.length, 1)
+  assert.match(alerts[0], /Bad credentials/)
 })

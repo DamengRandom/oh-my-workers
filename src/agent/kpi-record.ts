@@ -7,12 +7,17 @@ function describeActivity(commits: number, prs: number): string {
   return `${plural(commits, 'commit')}, ${plural(prs, 'PR')} on GitHub`
 }
 
+export function isGithubDigest(githubOutput: string): boolean {
+  const data = parseJson<{ commits?: unknown; pullRequests?: unknown }>(githubOutput, {})
+
+  return Array.isArray(data.commits) || Array.isArray(data.pullRequests)
+}
+
 export function toKpiRecord(githubOutput: string, now: string): KpiRecord {
   const data = parseJson<{ summary?: string; commits?: unknown[]; pullRequests?: unknown[] }>(githubOutput, {})
-  const isDigest = Array.isArray(data.commits) || Array.isArray(data.pullRequests)
   const commits_count = data.commits?.length ?? 0
   const prs_count = data.pullRequests?.length ?? 0
-  const github_summary = data.summary?.trim() || (isDigest ? describeActivity(commits_count, prs_count) : '')
+  const github_summary = data.summary?.trim() || (isGithubDigest(githubOutput) ? describeActivity(commits_count, prs_count) : '')
 
   return {
     github_summary,
