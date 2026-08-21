@@ -77,19 +77,19 @@ function recordAlert(body: { text: string }): Response {
   return new Response('{"ok":true}', { status: 200 })
 }
 
+function githubSearch(): Response {
+  if (!githubUnauthorized) return jsonResponse({ total_count: 0, items: [] })
+
+  return new Response(JSON.stringify({ message: 'Bad credentials', documentation_url: 'https://docs.github.com/rest' }), {
+    status: 401,
+    headers: { 'content-type': 'application/json' },
+  })
+}
+
 globalThis.fetch = (async (target: unknown, init: { body?: string }) => {
   const url = String(target)
 
-  if (url.includes('api.github.com/search/')) {
-    if (githubUnauthorized) {
-      return new Response(JSON.stringify({ message: 'Bad credentials', documentation_url: 'https://docs.github.com/rest' }), {
-        status: 401,
-        headers: { 'content-type': 'application/json' },
-      })
-    }
-
-    return jsonResponse({ total_count: 0, items: [] })
-  }
+  if (url.includes('api.github.com/search/')) return githubSearch()
   if (url.includes('openrouter')) return completion(llmReply(JSON.parse(String(init.body))))
   if (url.includes('telegram')) return recordAlert(JSON.parse(String(init.body)))
 
