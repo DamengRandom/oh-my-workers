@@ -59,8 +59,11 @@ function llmReply(body: LlmRequest) {
   if (toolMsgs.some((m) => String(m.content).includes('ECONNREFUSED'))) return APOLOGY
 
   // A model that wants a preset and a SELECT of its own in the same turn — the
-  // second of those crosses the run limit.
-  if (parallelCalls && toolMsgs.length === 1) {
+  // second of those crosses the run limit. Cleared as it fires, so the turn
+  // after it answers rather than asking for both again.
+  if (parallelCalls) {
+    parallelCalls = false
+
     return toolCall(fn('run_named_query', { name: 'listKpi' }), fn('run_sql_query', { query: 'SELECT count(*) FROM diary' }))
   }
 
