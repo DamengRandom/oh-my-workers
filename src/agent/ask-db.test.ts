@@ -3,10 +3,14 @@ import assert from 'node:assert/strict'
 import { Pool } from 'pg'
 
 let dbDown = false
+let parallelCalls = false
+let queriesRun = 0
 
 // own-db.ts builds its pool when the module loads, so the stub has to land first.
 ;(Pool.prototype as unknown as { query: unknown }).query = async () => {
   if (dbDown) throw new Error('connect ECONNREFUSED 10.0.0.5:5432')
+
+  queriesRun += 1
 
   return { rows: [{ id: 1, title: 'stub row' }], rowCount: 1 }
 }
@@ -34,21 +38,33 @@ function completion(message: Record<string, unknown>): Response {
   })
 }
 
-const toolCall = (name: string, args: unknown) => ({
-  role: 'assistant',
-  content: null,
-  tool_calls: [{ id: name, type: 'function', function: { name, arguments: JSON.stringify(args) } }],
+let callId = 0
+
+const fn = (name: string, args: unknown) => ({
+  id: `${name}-${(callId += 1)}`,
+  type: 'function',
+  function: { name, arguments: JSON.stringify(args) },
 })
+
+const toolCall = (...calls: ReturnType<typeof fn>[]) => ({ role: 'assistant', content: null, tool_calls: calls })
 
 // First turn: ask the model, which calls the named-query tool. Second turn
 // (a tool result is now in the transcript): answer in prose — an apology if
 // the tool came back with the DB error, the row-based answer otherwise.
 function llmReply(body: LlmRequest) {
-  const toolMsg = body.messages.find((m) => m.role === 'tool')
+  const toolMsgs = body.messages.filter((m) => m.role === 'tool')
 
-  if (toolMsg) return String(toolMsg.content).includes('ECONNREFUSED') ? APOLOGY : ANSWER
+  if (!toolMsgs.length) return toolCall(fn('run_named_query', { name: 'listAiNews' }))
 
-  return toolCall('run_named_query', { name: 'listAiNews' })
+  if (toolMsgs.some((m) => String(m.content).includes('ECONNREFUSED'))) return APOLOGY
+
+  // A model that wants a preset and a SELECT of its own in the same turn — the
+  // second of those crosses the run limit.
+  if (parallelCalls && toolMsgs.length === 1) {
+    return toolCall(fn('run_named_query', { name: 'listKpi' }), fn('run_sql_query', { query: 'SELECT count(*) FROM diary' }))
+  }
+
+  return ANSWER
 }
 
 function recordAlert(body: { text: string }): Response {
@@ -76,6 +92,8 @@ const { runAskDb } = await import('./index.ts')
 beforeEach(() => {
   alerts.length = 0
   dbDown = false
+  parallelCalls = false
+  queriesRun = 0
 })
 
 // Captures what runAskDb prints without corrupting the test runner's own stdout.
@@ -115,4 +133,17 @@ test('surfaces a DB failure in the reply instead of crashing or paging', async (
 
   assert.match(out, /database is unreachable/)
   assert.deepEqual(alerts, [])
+})
+
+// Two tools are registered, so a turn can name both at once. The run limit has
+// to blunt the calls it cannot afford and let the model answer, not abort the
+// run — an aborted run reaches the user as a blank line and a pager alert.
+test('still answers when one turn asks for both tools and crosses the run limit', async () => {
+  parallelCalls = true
+
+  const out = await captureStdout(runAskDb)
+
+  assert.match(out, /There are 5 rows from the last 5 days\./)
+  assert.deepEqual(alerts, [])
+  assert.equal(queriesRun, 2)
 })

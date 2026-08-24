@@ -10,5 +10,5 @@ export const askDbAgent = () =>
     model: createLlm(),
     tools: [namedQueryTool, sqlQueryTool],
     systemPrompt: ASK_DB_PROMPT,
-    middleware: [toolCallLimitMiddleware({ runLimit: 2, exitBehavior: 'end' })],
+    middleware: [toolCallLimitMiddleware({ runLimit: 2, exitBehavior: 'continue' })],
   }))
