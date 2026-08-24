@@ -11,7 +11,7 @@ import { aiNewsSearchTool, selectUnseen } from '../tools/ai-news-search.tool.js'
 import { aiNewsTelegramTool } from '../tools/ai-news-telegram.tool.js'
 import { saveKpiRecord, saveTrendingRepos, saveAiNews, findSeenUrls } from '../storage/own-db.js'
 import { sectionLogger, logger, prompt } from '../utils/logger.js'
-import { notifyError, parseJson, toolOutput } from './utils.ts'
+import { notifyError, parseJson, toolOutput, finalAnswer } from './utils.ts'
 import { AgentResult, AiNewsItem, CuratedRepo, TrendingRepo } from '../schemas/index.ts'
 import { runCuratorGraph } from './curator.graph.ts'
 import { toKpiRecord } from './kpi-record.ts'
@@ -367,7 +367,7 @@ export class WorkCoordinator {
     try {
       const result = await askDbAgent().invoke({ messages: [{ role: 'user', content: question }] })
 
-      prompt(`\n${String(result.messages.at(-1)?.content ?? '')}\n`)
+      prompt(`\n${finalAnswer(result)}\n`)
     } catch (err) {
       logger.error({ err }, '❌ Ask DB agent failed')
       await notifyError('Ask DB agent', err)
