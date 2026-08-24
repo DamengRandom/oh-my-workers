@@ -1,5 +1,7 @@
+import * as readline from 'readline'
 import { githubAgent } from './github.agent.js'
 import { diaryAgent } from './diary.agent.js'
+import { askDbAgent } from './ask-db.agent.js'
 import { curateTrending } from './news-curator.agent.js'
 import { cleanupTool } from '../tools/cleanup.tool.js'
 import { manualKpiTool } from '../tools/manual-kpi.tool.js'
@@ -8,8 +10,8 @@ import { trendingScrapeTool } from '../tools/trending-scrape.tool.js'
 import { aiNewsSearchTool, selectUnseen } from '../tools/ai-news-search.tool.js'
 import { aiNewsTelegramTool } from '../tools/ai-news-telegram.tool.js'
 import { saveKpiRecord, saveTrendingRepos, saveAiNews, findSeenUrls } from '../storage/own-db.js'
-import { sectionLogger, logger } from '../utils/logger.js'
-import { notifyError, parseJson, toolOutput } from './utils.ts'
+import { sectionLogger, logger, prompt } from '../utils/logger.js'
+import { notifyError, parseJson, toolOutput, finalAnswer } from './utils.ts'
 import { AgentResult, AiNewsItem, CuratedRepo, TrendingRepo } from '../schemas/index.ts'
 import { runCuratorGraph } from './curator.graph.ts'
 import { toKpiRecord } from './kpi-record.ts'
@@ -324,6 +326,54 @@ export class WorkCoordinator {
     sectionLogger(`✅ AI News job complete for ${today}`)
   }
 
+  // ── Ask DB: helpers ────────────────────────────────────────────────────────
+
+  // CI mode: ASK_DB_QUESTION is set via workflow_dispatch input, same as
+  // MANUAL_ACTIVITIES for the KPI job. Falls back to one line of readline input.
+  private static async collectQuestion(): Promise<string> {
+    if (process.env.ASK_DB_QUESTION) return process.env.ASK_DB_QUESTION
+
+    prompt('\n──────────────────────────────────────────')
+    prompt('💬 What do you want to know about the database?\n')
+
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+
+    rl.setPrompt('  > ')
+    rl.prompt()
+
+    for await (const line of rl) {
+      rl.close()
+      prompt('──────────────────────────────────────────\n')
+      return line.trim()
+    }
+
+    rl.close()
+
+    return ''
+  }
+
+  // ── Ask DB — answer a natural-language question with a SQL query ──────────
+
+  static async runAskDb(): Promise<void> {
+    sectionLogger('🤖 Oh My Workers — Ask DB')
+
+    const question = await WorkCoordinator.collectQuestion()
+
+    if (!question) {
+      logger.info('⏭️ No question provided — skipping.')
+      return
+    }
+
+    try {
+      const result = await askDbAgent().invoke({ messages: [{ role: 'user', content: question }] })
+
+      prompt(`\n${finalAnswer(result)}\n`)
+    } catch (err) {
+      logger.error({ err }, '❌ Ask DB agent failed')
+      await notifyError('Ask DB agent', err)
+    }
+  }
+
   // Steps 1-2 together: scrape, then rank. Returns null when there is nothing
   // worth curating — a failed scrape (already notified) or an empty page.
   private static async collectTopRepos(): Promise<TrendingRepo[] | null> {
@@ -380,4 +430,4 @@ export class WorkCoordinator {
 }
 
 // ── Named exports for backwards compatibility with index.ts and registry.ts ───
-export const { runCleanup, runDailyJobs, runNewsAgent, runAiNewsAgent } = WorkCoordinator
+export const { runCleanup, runDailyJobs, runNewsAgent, runAiNewsAgent, runAskDb } = WorkCoordinator

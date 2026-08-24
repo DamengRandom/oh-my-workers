@@ -174,6 +174,45 @@ export async function findSeenUrls(urls: string[]): Promise<Set<string>> {
   return new Set(rows.map((r) => r.url))
 }
 
+// Ad-hoc, read-only access for the ask-db agent — one preset per table, plus a
+// guarded path for a SELECT the agent writes itself.
+export const namedQueries = {
+  listAiNews: 'SELECT * FROM ai_news ORDER BY created_at DESC LIMIT 20',
+  listCleanupLog: 'SELECT * FROM cleanup_log ORDER BY created_at DESC LIMIT 20',
+  listDiary: 'SELECT * FROM diary ORDER BY created_at DESC LIMIT 20',
+  listGithubTrending: 'SELECT * FROM github_trending ORDER BY created_at DESC LIMIT 20',
+  listKpi: 'SELECT * FROM kpi ORDER BY created_at DESC LIMIT 20',
+} as const
+
+export type NamedQuery = keyof typeof namedQueries
+
+export async function runNamedQuery(name: NamedQuery): Promise<unknown[]> {
+  const { rows } = await pool.query(namedQueries[name])
+
+  return rows
+}
+
+const WRITE_KEYWORDS = /\b(insert|update|delete|drop|alter|truncate|create|grant|revoke|copy|merge|call|vacuum|comment|into)\b/i
+
+// Pure — no DB access — so it's testable without a connection. Throws on
+// anything that isn't a single read-only SELECT; adds LIMIT 200 if missing.
+export function toSafeSelect(query: string): string {
+  const trimmed = query.trim().replace(/;\s*$/, '')
+
+  if (trimmed.includes(';')) throw new Error('Only a single statement is allowed.')
+  if (!/^select\b/i.test(trimmed)) throw new Error('Only SELECT statements are allowed.')
+  if (WRITE_KEYWORDS.test(trimmed)) throw new Error('Query contains a disallowed keyword.')
+
+  return /\blimit\b/i.test(trimmed) ? trimmed : `${trimmed} LIMIT 200`
+}
+
+// The agent writes `query` itself — toSafeSelect is the trust boundary.
+export async function runReadOnlyQuery(query: string): Promise<unknown[]> {
+  const { rows } = await pool.query(toSafeSelect(query))
+
+  return rows
+}
+
 // ─── Teardown ─────────────────────────────────────────────────────────────────
 
 export async function closeOwnDb(): Promise<void> {
