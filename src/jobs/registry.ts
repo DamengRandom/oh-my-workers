@@ -1,4 +1,4 @@
-import { runDailyJobs, runCleanup, runNewsAgent, runAiNewsAgent } from '../agent/index.js'
+import { runDailyJobs, runCleanup, runNewsAgent, runAiNewsAgent, runAskDb } from '../agent/index.js'
 import { AI_NEWS_CRON_TIME, DEFAULT_CRONJOB_TIME, DEFAULT_CRONJOB_TIMEZONE, NEWS_CRON_TIME } from '../constants/index.js'
 
 /**
@@ -46,6 +46,11 @@ export const jobs: Job[] = [
     schedule: AI_NEWS_CRON_TIME,
     timezone: DEFAULT_CRONJOB_TIMEZONE,
     run: runAiNewsAgent,
+  },
+  {
+    name: 'ask-db',
+    description: 'Ask a natural-language question about the database (interactive, no schedule)',
+    run: runAskDb,
   },
 ]
 

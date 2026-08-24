@@ -30,6 +30,14 @@ export function toolOutput(result: AgentResult, toolName: string): string {
   return `${content ?? ''}`
 }
 
+// The graph does not guarantee the final AI message is last in the array — a
+// tool message can land after it — so find it by type instead of by position.
+export function finalAnswer(result: AgentResult): string {
+  const msg = [...result.messages].reverse().find((m) => m._getType?.() === 'ai')
+
+  return msg ? `${msg.content ?? ''}` : ''
+}
+
 export function parseJson<T>(raw: string, fallback: T): T {
   try {
     return JSON.parse(raw) as T
