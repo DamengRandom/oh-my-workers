@@ -14,7 +14,7 @@ import { sectionLogger, logger, prompt } from '../utils/logger.js'
 import { notifyError, parseJson, toolOutput, finalAnswer } from './utils.ts'
 import { AgentResult, AiNewsItem, CuratedRepo, TrendingRepo } from '../schemas/index.ts'
 import { runCuratorGraph } from './curator.graph.ts'
-import { toKpiRecord } from './kpi-record.ts'
+import { isGithubDigest, toKpiRecord } from './kpi-record.ts'
 import { AI_NEWS_TOP_N, TRENDING_TOP_N } from '../constants/index.js'
 
 export class WorkCoordinator {
@@ -135,6 +135,17 @@ export class WorkCoordinator {
     }
 
     const githubResult = githubSettled.value
+    const githubOutput = toolOutput(githubResult, 'fetch_github_activity')
+
+    // A tool that throws comes back as a tool message, not a rejection — the day is
+    // only recorded if the fetch itself returned activity.
+    if (!isGithubDigest(githubOutput)) {
+      logger.error({ output: githubOutput }, '❌ GitHub agent failed')
+
+      await notifyError('GitHub agent', `fetch_github_activity returned no activity — ${githubOutput || 'the agent never called it'}`)
+
+      return
+    }
 
     // ── Phase 2: Manual input (interactive, sequential) ──────────────────────
     logger.info('⚡️ Phase 2: Collecting manual activities...')
