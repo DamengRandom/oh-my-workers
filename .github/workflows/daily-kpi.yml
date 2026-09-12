@@ -36,6 +36,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TARGET_GITHUB_USERNAME: ${{ secrets.TARGET_GITHUB_USERNAME }}
           MANUAL_ACTIVITIES: ${{ github.event.inputs.activities }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           LANGSMITH_TRACING: 'true'
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
           LANGSMITH_PROJECT: oh-my-workers
