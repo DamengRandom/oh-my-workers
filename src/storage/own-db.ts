@@ -193,6 +193,7 @@ export async function runNamedQuery(name: NamedQuery): Promise<unknown[]> {
 }
 
 const WRITE_KEYWORDS = /\b(insert|update|delete|drop|alter|truncate|create|grant|revoke|copy|merge|call|vacuum|comment|into)\b/i
+const SQL_COMMENTS = /--[^\n]*|\/\*[\s\S]*?\*\//g
 
 // Pure — no DB access — so it's testable without a connection. Throws on
 // anything that isn't a single read-only SELECT; adds LIMIT 200 if missing.
@@ -203,7 +204,7 @@ export function toSafeSelect(query: string): string {
   if (!/^select\b/i.test(trimmed)) throw new Error('Only SELECT statements are allowed.')
   if (WRITE_KEYWORDS.test(trimmed)) throw new Error('Query contains a disallowed keyword.')
 
-  return /\blimit\b/i.test(trimmed) ? trimmed : `${trimmed} LIMIT 200`
+  return /\blimit\b/i.test(trimmed.replace(SQL_COMMENTS, '')) ? trimmed : `${trimmed}\nLIMIT 200`
 }
 
 // The agent writes `query` itself — toSafeSelect is the trust boundary.
