@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { createLlm } from './llm.js'
+import { defaultModel } from './llm.js'
 import { TRENDING_CURATOR_PROMPT } from './prompt.js'
 import type { TrendingRepo } from '../schemas/index.js'
 
@@ -43,7 +43,7 @@ export async function curateTrending(repos: TrendingRepo[], feedback?: string): 
     ? `Write the digest entries for these repos:\n\n${listing}\n\nYour previous response could not be parsed (${feedback}). Return output matching the required schema exactly.`
     : `Write the digest entries for these repos:\n\n${listing}`
 
-  const result = await createLlm(0.5)
+  const result = await defaultModel(0.5)
     .withStructuredOutput(SummarySchema)
     .invoke([
       { role: 'system', content: TRENDING_CURATOR_PROMPT },

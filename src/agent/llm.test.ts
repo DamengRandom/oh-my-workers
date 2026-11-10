@@ -1,6 +1,6 @@
 import { test, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { createLlm, failLoudlyOnProviderError } from './llm.ts'
+import { defaultModel, failLoudlyOnProviderError } from './llm.ts'
 import { DEFAULT_LLM, LLM_FALLBACK_MODELS } from '../constants/index.ts'
 
 const realFetch = globalThis.fetch
@@ -93,7 +93,7 @@ test('every configured fallback actually reaches OpenRouter', () => {
   delete process.env.LLM_MODEL
 
   try {
-    const { modelKwargs } = createLlm() as unknown as { modelKwargs: { models: string[] } }
+    const { modelKwargs } = defaultModel() as unknown as { modelKwargs: { models: string[] } }
 
     assert.equal(modelKwargs.models[0], DEFAULT_LLM, 'primary must be tried first')
     for (const fb of LLM_FALLBACK_MODELS) {
