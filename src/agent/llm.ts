@@ -21,7 +21,7 @@ export const failLoudlyOnProviderError: typeof fetch = async (input, init) => {
   return res
 }
 
-export const createLlm = (temperature = 0) => {
+export const defaultModel = (temperature = 0) => {
   const apiKey = process.env.LLM_API_KEY
 
   if (!apiKey) throw new Error('LLM_API_KEY is not set — the agents have no model to call')
